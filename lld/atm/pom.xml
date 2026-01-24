@@ -5,25 +5,11 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.raushan</groupId>
-        <artifactId>system-design</artifactId>
+        <artifactId>lld</artifactId>
         <version>1.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>lld</artifactId>
-    <packaging>pom</packaging>
-    <modules>
-        <module>tictactoe</module>
-        <module>snakeladder</module>
-        <module>lrucache</module>
-        <module>parking-lot</module>
-        <module>bloom-filter</module>
-        <module>autocomplete-search</module>
-        <module>task-management</module>
-        <module>notification-system</module>
-        <module>stackoverflow</module>
-        <module>amazon-locker</module>
-        <module>atm</module>
-    </modules>
+    <artifactId>atm</artifactId>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
