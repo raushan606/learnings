@@ -1,23 +1,21 @@
 package com.raushan.linkedlist;
 
 public class DoublyLinkedList<K, V> {
-
     Node<K, V> head;
     Node<K, V> tail;
 
     public DoublyLinkedList() {
-        this.head = new Node<>(null, null);
-        this.tail = new Node<>(null, null);
-        this.head.next = tail;
-        this.tail.prev = head;
+        head = new Node<>(null, null);
+        tail = new Node<>(null, null);
+        head.next = tail;
+        tail.prev = head;
     }
-
 
     public void addToFirst(Node<K, V> node) {
         node.next = head.next;
-        node.prev = head;
         head.next.prev = node;
         head.next = node;
+        node.prev = head;
     }
 
     public void remove(Node<K, V> node) {
@@ -31,11 +29,13 @@ public class DoublyLinkedList<K, V> {
     }
 
     public Node<K, V> removeLast() {
+        // Check if list is empty (only dummies present)
         if (tail.prev == head) {
             return null;
         }
-        var node = tail.prev;
-        remove(node);
-        return node;
+
+        Node<K, V> last = tail.prev;
+        remove(last);
+        return last;
     }
 }

@@ -1,6 +1,5 @@
 package com.raushan.cache;
 
-import com.raushan.Cache;
 import com.raushan.linkedlist.DoublyLinkedList;
 import com.raushan.linkedlist.Node;
 
@@ -8,48 +7,40 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class LRUCache<K, V> implements Cache<K, V> {
-
     private final int capacity;
-    private final Map<K, Node<K, V>> cache;
-    private final DoublyLinkedList<K, V> dll;
+    private final Map<K, Node<K, V>> map;
+    private final DoublyLinkedList<K, V> list;
 
     public LRUCache(int capacity) {
         this.capacity = capacity;
-        this.cache = new HashMap<>(capacity);
-        this.dll = new DoublyLinkedList<>();
+        this.map = new HashMap<>();
+        this.list = new DoublyLinkedList<>();
     }
 
-    @Override
     public synchronized V get(K key) {
-        if (!cache.containsKey(key)) return null;
-        Node<K, V> node = cache.get(key);
-        dll.moveToFront(node);
+        if (!map.containsKey(key)) {
+            return null;
+        }
+        Node<K, V> node = map.get(key);
+        list.moveToFront(node);
         return node.getValue();
     }
 
-    @Override
-    public void put(K key, V value) {
-        if (cache.containsKey(key)) {
-            Node<K, V> node = cache.get(key);
-            node.setValue(value);
-            dll.moveToFront(node);
+    public synchronized void put(K key, V value) {
+        if (map.containsKey(key)) {
+            Node<K, V> node = map.get(key);
+            list.moveToFront(node);
+            return;
         } else {
-            if (cache.size() == capacity) {
-                Node<K, V> tail = dll.removeLast();
-                if (tail != null)
-                    cache.remove(tail.getKey());
+            if (map.size() == capacity) {
+                Node<K, V> last = list.removeLast();
+                map.remove(last.getKey());
             }
-            Node<K, V> node = new Node<>(key, value);
-            cache.put(key, node);
-            dll.addToFirst(node);
+            Node<K, V> newNode = new Node<>(key, value);
+            map.put(key, newNode);
+            list.addToFirst(newNode);
         }
     }
 
-    @Override
-    public synchronized void evict(K key) {
-        if (!cache.containsKey(key)) return;
-        Node<K, V> node = cache.get(key);
-        dll.remove(node);
-        cache.remove(key);
-    }
+
 }
