@@ -25,6 +25,7 @@
         <module>atm</module>
         <module>logging</module>
         <module>rate-limiter</module>
+        <module>vending-machine</module>
     </modules>
 
     <properties>
