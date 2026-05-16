@@ -26,6 +26,7 @@
         <module>logging</module>
         <module>rate-limiter</module>
         <module>vending-machine</module>
+        <module>movie-booking</module>
     </modules>
 
     <properties>
