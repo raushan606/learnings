@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prompt Engineering, Explained Simply — a Claude tutorial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F3F4F8; --surface:#FFFFFF;
+    --ink:#191C28; --muted:#5A6172; --faint:#8A90A0;
+    --line:#E2E4EC; --line-strong:#CFD3DE;
+    --indigo:#3D3A98; --indigo-dark:#2A2870; --indigo-tint:#ECEBF6;
+    --teal:#14746F; --teal-dark:#0E4F4B; --teal-tint:#E1F0EC;
+    --ochre:#A66A00; --ochre-dark:#7A4E00; --ochre-tint:#FBF1DC;
+    --green:#2E7D46; --green-dark:#1E5A31; --green-tint:#E6F2E9;
+    --rose:#B23A48; --rose-dark:#822833; --rose-tint:#FBE9EB;
+    --slate:#33384A; --slate-tint:#EBECF0;
+    --code-bg:#1B1E2B; --code-fg:#E7E8EF; --code-cmt:#7F86A0; --code-str:#E0B878;
+    --sans:"Space Grotesk",-apple-system,system-ui,sans-serif;
+    --serif:"Source Serif 4",Georgia,serif;
+    --mono:"JetBrains Mono",ui-monospace,monospace;
+    --wrap:1160px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--serif);
+    font-size:18px;line-height:1.72;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+
+  /* reading progress */
+  #progress{position:fixed;top:0;left:0;height:3px;width:0;background:var(--indigo);z-index:50;transition:width .08s linear}
+
+  .wrap{max-width:var(--wrap);margin:0 auto;padding:0 28px}
+
+  /* ---------- hero ---------- */
+  header{padding:64px 0 40px;border-bottom:1px solid var(--line)}
+  .hero{display:grid;grid-template-columns:1.15fr .85fr;gap:56px;align-items:center}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--indigo);font-weight:600}
+  h1{font-family:var(--sans);font-weight:600;font-size:clamp(34px,5.4vw,50px);line-height:1.04;letter-spacing:-.02em;margin:16px 0 18px}
+  h1 .u{color:var(--indigo)}
+  .lede{font-size:20px;color:#33384a;margin:0 0 22px;max-width:38ch}
+  .meta{display:flex;flex-wrap:wrap;gap:10px}
+  .chip{font-family:var(--mono);font-size:11.5px;letter-spacing:.03em;color:var(--muted);
+    background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 11px}
+
+  /* transcript signature card */
+  .transcript{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    box-shadow:0 1px 0 rgba(25,28,40,.03),0 18px 40px -28px rgba(25,28,40,.35);overflow:hidden}
+  .transcript .bar{display:flex;gap:6px;padding:12px 14px;border-bottom:1px solid var(--line);background:#FBFBFD}
+  .transcript .bar i{width:9px;height:9px;border-radius:50%;background:var(--line-strong)}
+  .turn{padding:13px 16px;border-bottom:1px solid var(--line);font-size:15px;line-height:1.55}
+  .turn:last-child{border-bottom:0}
+  .turn .txt{margin-top:6px;color:#2b3040}
+  .turn.ast .txt{color:var(--muted)}
+
+  .role{display:inline-block;font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.05em;
+    text-transform:uppercase;padding:2px 8px;border-radius:5px;vertical-align:middle}
+  .r-sys{background:var(--indigo-tint);color:var(--indigo-dark)}
+  .r-usr{background:var(--ochre-tint);color:var(--ochre-dark)}
+  .r-ast{background:var(--green-tint);color:var(--green-dark)}
+
+  /* ---------- layout ---------- */
+  .layout{display:grid;grid-template-columns:230px minmax(0,760px);gap:64px;justify-content:center;
+    padding:56px 0 40px;align-items:start}
+  nav.toc{position:sticky;top:26px;font-family:var(--mono);font-size:12.5px;line-height:1.5}
+  nav.toc .tl{color:var(--faint);letter-spacing:.14em;text-transform:uppercase;font-size:11px;margin-bottom:14px}
+  nav.toc a{display:block;color:var(--muted);text-decoration:none;padding:7px 0 7px 14px;
+    border-left:2px solid var(--line);transition:color .15s,border-color .15s}
+  nav.toc a:hover{color:var(--ink)}
+  nav.toc a.active{color:var(--indigo);border-left-color:var(--indigo);font-weight:600}
+  nav.toc a .n{color:var(--faint);margin-right:8px}
+  nav.toc a.active .n{color:var(--indigo)}
+
+  article{min-width:0}
+  section{margin-bottom:64px;scroll-margin-top:24px}
+  .step{font-family:var(--mono);font-size:12.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--indigo)}
+  .step .dot{color:var(--line-strong);margin:0 8px}
+  section h2{font-family:var(--sans);font-weight:600;font-size:29px;line-height:1.12;letter-spacing:-.015em;margin:12px 0 18px}
+  section h3{font-family:var(--sans);font-weight:600;font-size:18px;letter-spacing:-.01em;margin:30px 0 6px;color:var(--ink)}
+  p{margin:0 0 18px}
+  strong{font-weight:600;color:var(--ink)}
+  a{color:var(--indigo);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+  a:hover{text-decoration-thickness:2px}
+
+  /* inline code */
+  code{font-family:var(--mono);font-size:.85em;background:var(--indigo-tint);color:var(--indigo-dark);
+    padding:1.5px 6px;border-radius:5px;word-break:break-word}
+
+  /* code block */
+  pre{margin:22px 0;background:var(--code-bg);border-radius:12px;padding:18px 20px;overflow-x:auto;
+    border:1px solid #262a3b}
+  pre code{font-family:var(--mono);font-size:13.5px;line-height:1.7;background:none;color:var(--code-fg);padding:0;border-radius:0;white-space:pre}
+  .c-cmt{color:var(--code-cmt);font-style:italic}
+  .c-str{color:var(--code-str)}
+  .codecap{font-family:var(--mono);font-size:11.5px;color:var(--faint);margin:-10px 0 24px;letter-spacing:.02em}
+
+  /* callouts */
+  .callout{border:1px solid var(--line);border-radius:12px;padding:16px 18px 6px;margin:22px 0;background:var(--surface)}
+  .callout .lab{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+    display:inline-block;padding:3px 9px;border-radius:6px;margin-bottom:8px}
+  .callout p{margin:0 0 12px;font-size:16.5px}
+  .plain{background:var(--ochre-tint);border-color:#EBD9A8}
+  .plain .lab{background:#F3E4BD;color:var(--ochre-dark)}
+  .tip{background:var(--indigo-tint);border-color:#D6D3EE}
+  .tip .lab{background:#DEDBF3;color:var(--indigo-dark)}
+  .warn{background:var(--rose-tint);border-color:#F1CDD1}
+  .warn .lab{background:#F5D6DA;color:var(--rose-dark)}
+
+  /* uses list */
+  .uses{margin:24px 0 6px}
+  .uses .lab{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--teal-dark)}
+  .uses ul{list-style:none;padding:0;margin:10px 0 0}
+  .uses li{position:relative;padding:6px 0 6px 22px;font-size:16.5px;border-bottom:1px solid var(--line)}
+  .uses li:last-child{border-bottom:0}
+  .uses li::before{content:"";position:absolute;left:2px;top:15px;width:7px;height:7px;border-radius:2px;background:var(--teal)}
+
+  /* 3 shot cards */
+  .cards3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:24px 0}
+  .shot{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .shot h4{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--indigo-dark);margin:0 0 6px}
+  .shot p{font-size:14.5px;line-height:1.5;color:var(--muted);margin:0}
+
+  /* diagram figure */
+  figure{margin:26px 0;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px 20px 10px}
+  figure svg{display:block;width:100%;height:auto}
+  figcaption{font-family:var(--mono);font-size:11.5px;color:var(--faint);text-align:center;margin-top:8px;letter-spacing:.02em}
+  .d-t{font-family:var(--sans);font-weight:500;font-size:14px;fill:var(--ink)}
+  .d-s{font-family:var(--serif);font-size:12.5px;fill:var(--muted)}
+  .d-lab{font-family:var(--mono);font-size:11px;letter-spacing:.06em;fill:var(--faint)}
+
+  /* footer / resources */
+  footer{border-top:1px solid var(--line);padding:44px 0 72px;margin-top:8px}
+  .res{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px 0 0}
+  .res a{display:block;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;
+    text-decoration:none;color:var(--ink);transition:border-color .15s,transform .15s}
+  .res a:hover{border-color:var(--indigo);transform:translateY(-1px)}
+  .res .k{font-family:var(--mono);font-size:11px;color:var(--indigo);letter-spacing:.05em;display:block;margin-bottom:3px}
+  .res .d{font-size:14px;color:var(--muted);line-height:1.4}
+  .endnote{font-size:15px;color:var(--muted);margin-top:26px}
+
+  /* focus */
+  a:focus-visible,nav.toc a:focus-visible{outline:2px solid var(--indigo);outline-offset:3px;border-radius:3px}
+
+  @media (max-width:980px){
+    .layout{grid-template-columns:minmax(0,760px);gap:0}
+    nav.toc{display:none}
+  }
+  @media (max-width:720px){
+    .hero{grid-template-columns:1fr;gap:32px}
+    .cards3{grid-template-columns:1fr}
+    .res{grid-template-columns:1fr}
+    body{font-size:17px}
+    header{padding:44px 0 32px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    *{transition:none!important;animation:none!important}
+  }
+</style>
+</head>
+<body>
+<div id="progress" aria-hidden="true"></div>
+
+<header>
+  <div class="wrap">
+    <div class="hero">
+      <div>
+        <span class="eyebrow">A hands-on tutorial · with Claude</span>
+        <h1>Prompt engineering,<br><span class="u">explained simply.</span></h1>
+        <p class="lede">You don't program a language model. You <em>brief</em> it — like a brilliant new teammate who takes everything literally. These are the four briefing skills that carry most of the weight.</p>
+        <div class="meta">
+          <span class="chip">Beginner-friendly</span>
+          <span class="chip">Python examples</span>
+          <span class="chip">~15 min read</span>
+        </div>
+      </div>
+      <div class="transcript" aria-label="Example of a prompt as a conversation">
+        <div class="bar"><i></i><i></i><i></i></div>
+        <div class="turn"><span class="role r-sys">System</span><div class="txt">You are a patient tutor. Explain simply and use one analogy.</div></div>
+        <div class="turn"><span class="role r-usr">User</span><div class="txt">What is a system prompt?</div></div>
+        <div class="turn ast"><span class="role r-ast">Assistant</span><div class="txt">Think of it as the director's note to an actor before the show begins…</div></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+<div class="layout">
+
+  <nav class="toc" aria-label="Contents">
+    <div class="tl">On this page</div>
+    <a href="#start"><span class="n">00</span>Start here</a>
+    <a href="#roles"><span class="n">01</span>System vs user prompts</a>
+    <a href="#fewshot"><span class="n">02</span>Few-shot prompting</a>
+    <a href="#structured"><span class="n">03</span>Structured outputs</a>
+    <a href="#guardrails"><span class="n">04</span>Guardrails</a>
+    <a href="#together"><span class="n">05</span>Putting it together</a>
+    <a href="#resources"><span class="n">→</span>Keep learning</a>
+  </nav>
+
+  <article>
+
+    <!-- 00 -->
+    <section id="start">
+      <span class="step">Start here</span>
+      <h2>You don't code a model — you brief it</h2>
+      <p><strong>Prompt engineering</strong> is the craft of writing instructions that get a language model to do what you want. There's no compiler and no training run. You write text, send it, and read what comes back. If the result is off, you rewrite the instructions and try again — that fast loop <em>is</em> the whole job.</p>
+      <p>The mental model that helps most: imagine you've just hired a brilliant new teammate. They're fast, widely read, and eager to help — but they have zero context on your project and they take everything you say literally. Your job is to brief them well. The clearer the brief, the better the work.</p>
+      <p>Why brief the model instead of "training" it? Because prompting is far faster and cheaper than fine-tuning, it keeps everything human-readable, and it keeps working when the model gets upgraded — no retraining required.</p>
+      <div class="callout tip">
+        <span class="lab">What this covers</span>
+        <p><strong>1 · System vs user prompts</strong> — where your rules go vs where the task goes. <strong>2 · Few-shot</strong> — teaching by example. <strong>3 · Structured outputs</strong> — getting clean data back instead of prose. <strong>4 · Guardrails</strong> — keeping it accurate and safe in the real world.</p>
+      </div>
+    </section>
+
+    <!-- 01 -->
+    <section id="roles">
+      <span class="step">01 <span class="dot">/</span> The building blocks</span>
+      <h2>System vs user prompts</h2>
+
+      <div class="callout plain">
+        <span class="lab">In plain words</span>
+        <p>Think of a stage play. The <strong>system prompt</strong> is the director's note to the actor before the show — <em>"You're a calm ER doctor. Keep answers short. Never give legal advice."</em> The <strong>user prompt</strong> is the line the actor actually has to respond to in the scene. The note shapes every response; the line changes every time.</p>
+      </div>
+
+      <h3>What it is</h3>
+      <p>Every request you send Claude has two kinds of text. The <strong>system prompt</strong> sets the persona, the rules, and any background that should stay constant for the whole conversation. The <strong>user prompt</strong> is the specific task or question. In code, this is a top-level <code>system</code> field, plus a list of <code>messages</code> tagged with roles — <span class="role r-usr">user</span> for what you send and <span class="role r-ast">assistant</span> for Claude's replies.</p>
+
+      <h3>Why it matters</h3>
+      <p>Two reasons. First, <strong>steering</strong>: giving Claude a clear role and rules up front reliably lifts the quality and consistency of what comes back. Second, <strong>safety</strong>: keeping your rules in the system prompt makes them harder to knock over. A user who types <em>"ignore your instructions"</em> is arguing with the script — they're not rewriting the director's notes.</p>
+
+      <h3>How to do it well</h3>
+      <p>Put the durable stuff in <code>system</code>: who Claude is, the tone, formatting rules, hard limits ("never do X"), and any reference facts. Put only the changing request in the user message. And be specific — <em>"You are a senior Java reviewer; point out bugs and suggest fixes; be blunt"</em> beats <em>"be helpful."</em></p>
+
+      <pre><code>from anthropic import Anthropic
+client = Anthropic()
+
+msg = client.messages.create(
+    model="claude-sonnet-4-5",
+    max_tokens=1024,
+    system="You are a senior Java code reviewer. Point out bugs "
+           "and suggest fixes. Be blunt and concise.",   <span class="c-cmt"># the director's note</span>
+    messages=[
+        {"role": "user",
+         "content": "Review: public int div(int a,int b){return a/b;}"}
+    ],
+)
+print(msg.content[0].text)</code></pre>
+      <p class="codecap">The system text stays put across turns; only the user message changes.</p>
+
+      <div class="uses">
+        <span class="lab">Where you'd use it</span>
+        <ul>
+          <li>A support bot whose personality and boundaries are fixed once, in the system prompt.</li>
+          <li>A coding assistant told its exact role and your team's standards.</li>
+          <li>Any app where many different user questions should all be answered in the same voice and format.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 02 -->
+    <section id="fewshot">
+      <span class="step">02 <span class="dot">/</span> The building blocks</span>
+      <h2>Few-shot prompting</h2>
+
+      <div class="callout plain">
+        <span class="lab">In plain words</span>
+        <p>It's the difference between telling a new hire <em>"sort these tickets by type"</em> and <em>showing</em> them three tickets you've already sorted correctly. The examples remove all the guesswork about what "correct" actually looks like.</p>
+      </div>
+
+      <h3>What it is</h3>
+      <p><strong>Few-shot</strong> prompting (Anthropic's docs call it <strong>multishot</strong>) means putting a few worked examples — an input plus the exact output you want — inside your prompt, <em>before</em> the real input. The names just count the examples:</p>
+
+      <div class="cards3">
+        <div class="shot"><h4>Zero-shot</h4><p>Instructions only, no examples. "Label this ticket."</p></div>
+        <div class="shot"><h4>One-shot</h4><p>Exactly one example shown before the real task.</p></div>
+        <div class="shot"><h4>Few-shot</h4><p>Several examples (usually 3–5) covering the different cases.</p></div>
+      </div>
+
+      <h3>Why it matters</h3>
+      <p>Examples <strong>show instead of tell</strong>. They lock in the format, the tone, and the tricky edge cases far more reliably than describing them in words ever could. This is one of the highest-leverage moves for making output consistent.</p>
+
+      <h3>How to do it well</h3>
+      <p>Use 3–5 examples that are <strong>diverse</strong> (cover the cases you actually expect) and <strong>relevant</strong>. Wrap each one in tags like <code>&lt;example&gt;…&lt;/example&gt;</code> so Claude can clearly see where one ends and the next begins.</p>
+
+      <pre><code>examples = """
+&lt;example&gt;&lt;ticket&gt;My card was charged twice.&lt;/ticket&gt;&lt;label&gt;billing&lt;/label&gt;&lt;/example&gt;
+&lt;example&gt;&lt;ticket&gt;The app crashes on Export.&lt;/ticket&gt;&lt;label&gt;bug&lt;/label&gt;&lt;/example&gt;
+&lt;example&gt;&lt;ticket&gt;Please add a dark mode.&lt;/ticket&gt;&lt;label&gt;feature&lt;/label&gt;&lt;/example&gt;
+"""
+
+msg = client.messages.create(
+    model="claude-sonnet-4-5",
+    max_tokens=16,
+    system="Label each ticket as exactly one of: billing, bug, feature.",
+    messages=[{"role": "user",
+        "content": examples + "&lt;ticket&gt;I can't log in after the update.&lt;/ticket&gt;&lt;label&gt;"}],
+)   <span class="c-cmt"># Claude continues the pattern -> "bug"</span></code></pre>
+
+      <div class="uses">
+        <span class="lab">Where you'd use it</span>
+        <ul>
+          <li>Classifying text into a fixed set of categories.</li>
+          <li>Extracting fields in an exact shape you demonstrate.</li>
+          <li>Matching a specific writing style or answer format.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 03 -->
+    <section id="structured">
+      <span class="step">03 <span class="dot">/</span> Getting usable output</span>
+      <h2>Structured outputs</h2>
+
+      <div class="callout plain">
+        <span class="lab">In plain words</span>
+        <p>Asking Claude a normal question is like asking someone to write you a letter — you get lovely prose, but your code can't reliably pull facts out of it. Structured output is handing them a <strong>form</strong> instead. They fill in the boxes, and you get back tidy, predictable fields every single time.</p>
+      </div>
+
+      <h3>What it is</h3>
+      <p><strong>Structured outputs</strong> constrain the reply to a fixed shape — almost always JSON that matches a schema you define — so your program can parse it without guesswork or fragile string-hacking.</p>
+
+      <h3>Why it matters</h3>
+      <p>The moment Claude's answer feeds code — a database row, a UI component, the next step in a pipeline — you need the <strong>same shape every time</strong>. Free-form text breaks parsers; a schema-constrained object doesn't.</p>
+
+      <h3>How to do it in Claude</h3>
+      <p>There are two ways, and you can use them together:</p>
+      <p><strong>1 · The structured outputs feature (recommended).</strong> You pass a JSON schema and Claude's reply is guaranteed to match it. It has two parts: <em>JSON outputs</em> via <code>output_config.format</code> for the final answer, and <em>strict tool use</em> via <code>strict: true</code> to guarantee a tool's inputs match its schema. This is generally available on Claude 4.5 and later models.</p>
+
+      <pre><code>msg = client.messages.create(
+    model="claude-sonnet-4-5",
+    max_tokens=1024,
+    messages=[{"role": "user",
+        "content": "Extract contacts from: 'Call Dana Lee at dana@acme.io or 555-0134.'"}],
+    output_config={
+        "format": {
+            "type": "json_schema",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "name":  {"type": "string"},
+                    "email": {"type": "string"},
+                    "phone": {"type": "string"},
+                },
+                "required": ["name", "email", "phone"],
+                "additionalProperties": False,
+            },
+        }
+    },
+)   <span class="c-cmt"># msg.content[0].text is now guaranteed-valid JSON</span></code></pre>
+
+      <p><strong>2 · The tool-use trick (classic).</strong> Define a "tool" whose input schema is the shape you want, then force Claude to call it with <code>tool_choice</code>. Instead of prose, it returns arguments that match your schema. This works on older models too.</p>
+
+      <div class="callout tip">
+        <span class="lab">Tip</span>
+        <p>Don't write JSON Schema by hand. Generate it from <strong>Pydantic</strong> (Python) or <strong>Zod</strong> (TypeScript) — you define a normal class/type and get the schema plus typed parsing for free.</p>
+      </div>
+
+      <div class="uses">
+        <span class="lab">Where you'd use it</span>
+        <ul>
+          <li>Data-extraction pipelines that write straight to a database.</li>
+          <li>Classification services returning a label + a score.</li>
+          <li>Agents handing typed results to your app logic or UI.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 04 -->
+    <section id="guardrails">
+      <span class="step">04 <span class="dot">/</span> Making it production-ready</span>
+      <h2>Guardrails</h2>
+
+      <div class="callout plain">
+        <span class="lab">In plain words</span>
+        <p>Guardrails on a mountain road don't drive the car — they stop it going off the edge on the dangerous corners. Guardrails around a language model are the checks that keep it accurate, on-brand, and safe when inputs get weird or hostile.</p>
+      </div>
+
+      <h3>What it is</h3>
+      <p>A set of techniques that make a model reliable in production. Four common jobs: keep it from making things up (<strong>hallucinations</strong>), keep its output <strong>consistent</strong>, stop people tricking it (<strong>jailbreaks and prompt injection</strong>), and stop it leaking your hidden prompt (<strong>prompt leaks</strong>).</p>
+
+      <h3>The toolkit</h3>
+      <p><strong>Fewer hallucinations.</strong> Explicitly allow Claude to say <em>"I don't know"</em>; ask it to ground answers in direct quotes and cite its sources; and when you supply your own documents, tell it to answer <em>only</em> from those, not from general knowledge.</p>
+      <p><strong>More consistency.</strong> Specify the exact output format (this is where structured outputs earn their keep) and reinforce it with a couple of examples.</p>
+      <p><strong>Resist jailbreaks &amp; injection.</strong> Screen incoming user text with a small, cheap model like <strong>Claude Haiku 4.5</strong> before it reaches your main prompt; write a firm system prompt; and treat any untrusted content Claude reads with suspicion.</p>
+      <p><strong>Reduce prompt leaks.</strong> Keep your instructions clearly separated from the user's text, and never put secrets in a prompt that you couldn't afford to have exposed.</p>
+
+      <pre><code>system = (
+    "Answer ONLY using the documents provided below.\n"
+    "If the answer isn't in them, reply exactly: "
+    "'I don't know based on the provided documents.'\n"   <span class="c-cmt"># permission to abstain</span>
+    "Cite the document number you used."                  <span class="c-cmt"># make it auditable</span>
+)</code></pre>
+
+      <div class="callout warn">
+        <span class="lab">Watch out — two kinds of injection</span>
+        <p><strong>Direct:</strong> the user themselves is the attacker, typing <em>"ignore your rules and…"</em> into your app. <strong>Indirect:</strong> the user is trusted, but Claude reads outside content — a web page, an email, a document — that has hidden instructions buried inside it. Indirect is the sneaky one for any app that browses the web or reads files.</p>
+      </div>
+
+      <figure aria-labelledby="inj-cap">
+        <svg viewBox="0 0 720 262" role="img" xmlns="http://www.w3.org/2000/svg">
+          <title>Direct vs indirect prompt injection</title>
+          <desc>In direct injection the user is the attacker. In indirect injection a trusted user asks a normal question but Claude reads outside content that hides malicious instructions.</desc>
+          <defs>
+            <marker id="a-inj" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M2 1L8 5L2 9" fill="none" stroke="#5A6172" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </marker>
+          </defs>
+          <!-- row 1 -->
+          <text class="d-lab" x="20" y="30">DIRECT — THE USER IS THE ATTACKER</text>
+          <rect x="20" y="44" width="150" height="56" rx="10" fill="#FBE9EB" stroke="#E7A9B0" stroke-width="1"/>
+          <text class="d-t" x="95" y="68" text-anchor="middle">The user</text>
+          <text class="d-s" x="95" y="86" text-anchor="middle">crafts a jailbreak</text>
+          <line x1="170" y1="72" x2="286" y2="72" stroke="#5A6172" stroke-width="1.4" marker-end="url(#a-inj)"/>
+          <text class="d-s" x="228" y="62" text-anchor="middle">bad prompt</text>
+          <rect x="294" y="44" width="128" height="56" rx="10" fill="#EBECF0" stroke="#B7BCCC" stroke-width="1"/>
+          <text class="d-t" x="358" y="76" text-anchor="middle">Claude</text>
+          <text class="d-s" x="446" y="76">tries to break your rules</text>
+          <!-- row 2 -->
+          <text class="d-lab" x="20" y="150">INDIRECT — THE TRAP IS IN THE CONTENT</text>
+          <rect x="20" y="164" width="150" height="56" rx="10" fill="#ECEBF6" stroke="#C6C2E6" stroke-width="1"/>
+          <text class="d-t" x="95" y="188" text-anchor="middle">Trusted user</text>
+          <text class="d-s" x="95" y="206" text-anchor="middle">asks a normal thing</text>
+          <line x1="170" y1="192" x2="286" y2="192" stroke="#5A6172" stroke-width="1.4" marker-end="url(#a-inj)"/>
+          <rect x="294" y="164" width="128" height="56" rx="10" fill="#EBECF0" stroke="#B7BCCC" stroke-width="1"/>
+          <text class="d-t" x="358" y="196" text-anchor="middle">Claude</text>
+          <rect x="504" y="158" width="196" height="68" rx="10" fill="#FFFFFF" stroke="#A66A00" stroke-width="1.2" stroke-dasharray="5 5"/>
+          <text class="d-t" x="602" y="184" text-anchor="middle">Web page / email</text>
+          <text class="d-s" x="602" y="202" text-anchor="middle">hides "ignore your rules"</text>
+          <line x1="504" y1="192" x2="426" y2="192" stroke="#A66A00" stroke-width="1.4" marker-end="url(#a-inj)"/>
+        </svg>
+        <figcaption id="inj-cap">The user isn't always the threat — content Claude reads can carry the attack</figcaption>
+      </figure>
+
+      <div class="uses">
+        <span class="lab">Where you'd use it</span>
+        <ul>
+          <li>A retrieval assistant that must stick to your documents, not improvise.</li>
+          <li>A public chatbot facing users who probe for weaknesses.</li>
+          <li>Any agent that reads emails, files, or the open web.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 05 -->
+    <section id="together">
+      <span class="step">05 <span class="dot">/</span> Bringing it together</span>
+      <h2>All four in one small app</h2>
+      <p>Here's a support-ticket triage bot that uses every skill at once. The <strong>system prompt</strong> sets the role and rules, <strong>few-shot examples</strong> show how to label, <strong>structured output</strong> returns a clean verdict, and a small <strong>guardrail</strong> lets it flag <em>unsure</em> instead of guessing.</p>
+
+      <figure aria-labelledby="anat-cap">
+        <svg viewBox="0 0 720 470" role="img" xmlns="http://www.w3.org/2000/svg">
+          <title>Anatomy of a Claude request</title>
+          <desc>Three input layers — system prompt, few-shot examples, and user prompt — feed the Claude model, which returns structured JSON output. A guardrails layer wraps the whole pipeline.</desc>
+          <defs>
+            <marker id="a-anat" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M2 1L8 5L2 9" fill="none" stroke="#5A6172" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </marker>
+          </defs>
+          <rect x="40" y="44" width="300" height="316" rx="14" fill="#FBFBFD" stroke="#E2E4EC" stroke-width="1"/>
+          <text class="d-lab" x="62" y="76">YOUR REQUEST</text>
+
+          <rect x="62" y="92" width="256" height="64" rx="10" fill="#ECEBF6" stroke="#C6C2E6" stroke-width="1"/>
+          <text class="d-t" x="190" y="118" text-anchor="middle" fill="#2A2870">System prompt</text>
+          <text class="d-s" x="190" y="138" text-anchor="middle" fill="#5A5484">who Claude is + rules</text>
+
+          <rect x="62" y="168" width="256" height="64" rx="10" fill="#E1F0EC" stroke="#A9D5CB" stroke-width="1"/>
+          <text class="d-t" x="190" y="194" text-anchor="middle" fill="#0E4F4B">Few-shot examples</text>
+          <text class="d-s" x="190" y="214" text-anchor="middle" fill="#3B6E68">worked input &#8594; output</text>
+
+          <rect x="62" y="244" width="256" height="64" rx="10" fill="#FBF1DC" stroke="#EBD9A8" stroke-width="1"/>
+          <text class="d-t" x="190" y="270" text-anchor="middle" fill="#7A4E00">User prompt</text>
+          <text class="d-s" x="190" y="290" text-anchor="middle" fill="#8A6B2E">the actual task</text>
+
+          <line x1="340" y1="202" x2="384" y2="202" stroke="#5A6172" stroke-width="1.4" marker-end="url(#a-anat)"/>
+
+          <rect x="392" y="170" width="120" height="64" rx="10" fill="#EBECF0" stroke="#B7BCCC" stroke-width="1"/>
+          <text class="d-t" x="452" y="196" text-anchor="middle">Claude</text>
+          <text class="d-s" x="452" y="216" text-anchor="middle">the model</text>
+
+          <line x1="512" y1="202" x2="556" y2="202" stroke="#5A6172" stroke-width="1.4" marker-end="url(#a-anat)"/>
+
+          <rect x="564" y="170" width="116" height="64" rx="10" fill="#E6F2E9" stroke="#AED6BB" stroke-width="1"/>
+          <text class="d-t" x="622" y="196" text-anchor="middle" fill="#1E5A31">Output</text>
+          <text class="d-s" x="622" y="216" text-anchor="middle" fill="#3E7A52">clean JSON</text>
+
+          <rect x="40" y="392" width="640" height="52" rx="10" fill="none" stroke="#A66A00" stroke-width="1.2" stroke-dasharray="6 5"/>
+          <text class="d-lab" x="60" y="414" fill="#7A4E00">GUARDRAILS &#8212; WRAP EVERYTHING</text>
+          <text class="d-s" x="60" y="432" fill="#8A6B2E">screen input &#183; allow "I don't know" &#183; cite sources &#183; check the JSON</text>
+        </svg>
+        <figcaption id="anat-cap">One request, four skills working together</figcaption>
+      </figure>
+
+      <pre><code>schema = {
+    "type": "object",
+    "properties": {
+        "label":      {"type": "string",
+                       "enum": ["billing", "bug", "feature", "unsure"]},  <span class="c-cmt"># guardrail: an escape hatch</span>
+        "confidence": {"type": "number"},
+    },
+    "required": ["label", "confidence"],
+    "additionalProperties": False,
+}
+
+msg = client.messages.create(
+    model="claude-sonnet-4-5",
+    max_tokens=128,
+    system=(                                                    <span class="c-cmt"># 1 - role + rules</span>
+        "You triage support tickets. Label each as one of: "
+        "billing, bug, feature. If not clearly sure, use 'unsure'."
+    ),
+    messages=[{"role": "user",
+        "content": few_shot_examples + new_ticket}],            <span class="c-cmt"># 2 - few-shot</span>
+    output_config={"format": {"type": "json_schema", "schema": schema}},  <span class="c-cmt"># 3 - structured output</span>
+)</code></pre>
+      <p class="codecap">System prompt + few-shot + structured output + an "unsure" guardrail — all in one call.</p>
+    </section>
+
+    <footer id="resources">
+      <span class="step">Keep learning</span>
+      <h2 style="margin-top:12px">Official sources &amp; a hands-on course</h2>
+      <p>Everything above is grounded in Anthropic's own documentation. These are the best next stops:</p>
+      <div class="res">
+        <a href="https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/overview">
+          <span class="k">Docs · Overview</span><span class="d">When prompting is the right tool, and how to start.</span></a>
+        <a href="https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices">
+          <span class="k">Docs · Best practices</span><span class="d">System prompts, roles, multishot examples, XML structure — the living reference.</span></a>
+        <a href="https://platform.claude.com/docs/en/build-with-claude/structured-outputs">
+          <span class="k">Docs · Structured outputs</span><span class="d">JSON outputs and strict tool use, with schemas.</span></a>
+        <a href="https://platform.claude.com/docs/en/test-and-evaluate/strengthen-guardrails/mitigate-jailbreaks">
+          <span class="k">Docs · Strengthen guardrails</span><span class="d">Hallucinations, consistency, jailbreaks, and prompt leaks.</span></a>
+        <a href="https://github.com/anthropics/prompt-eng-interactive-tutorial">
+          <span class="k">Course · Interactive tutorial</span><span class="d">Nine chapters with exercises you run yourself.</span></a>
+        <a href="https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents">
+          <span class="k">Essay · What comes next</span><span class="d">Context engineering — the natural progression of prompting for agents.</span></a>
+      </div>
+      <p class="endnote">Best way to learn: keep one of these docs open, and rewrite a real prompt of yours as you read each section. The loop of write → send → read → adjust is the whole skill.</p>
+    </footer>
+
+  </article>
+</div>
+</div>
+
+<script>
+  // reading progress bar
+  var bar = document.getElementById('progress');
+  function onScroll(){
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var pct = max > 0 ? (h.scrollTop || document.body.scrollTop) / max * 100 : 0;
+    bar.style.width = pct + '%';
+  }
+  document.addEventListener('scroll', onScroll, {passive:true});
+  onScroll();
+
+  // active section highlight in the contents nav
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+  var map = {};
+  links.forEach(function(a){ map[a.getAttribute('href').slice(1)] = a; });
+  if ('IntersectionObserver' in window){
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if (e.isIntersecting){
+          links.forEach(function(a){ a.classList.remove('active'); });
+          var active = map[e.target.id];
+          if (active) active.classList.add('active');
+        }
+      });
+    }, {rootMargin:'-20% 0px -70% 0px', threshold:0});
+    document.querySelectorAll('article section, article footer').forEach(function(s){
+      if (s.id) obs.observe(s);
+    });
+  }
+</script>
+</body>
+</html>

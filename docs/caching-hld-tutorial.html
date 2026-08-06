@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Caching — a systems-design tutorial (strategies, eviction, stampede, hot keys)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F3F4F8; --surface:#FFFFFF;
+    --ink:#191C28; --muted:#5A6172; --faint:#8A90A0;
+    --line:#E2E4EC; --line-strong:#CFD3DE;
+    --indigo:#3D3A98; --indigo-dark:#2A2870; --indigo-tint:#ECEBF6;
+    --teal:#14746F; --teal-dark:#0E4F4B; --teal-tint:#E1F0EC;
+    --ochre:#A66A00; --ochre-dark:#7A4E00; --ochre-tint:#FBF1DC;
+    --green:#2E7D46; --green-dark:#1E5A31; --green-tint:#E6F2E9;
+    --rose:#B23A48; --rose-dark:#822833; --rose-tint:#FBE9EB;
+    --slate:#33384A; --slate-tint:#EBECF0;
+    --code-bg:#1B1E2B; --code-fg:#E7E8EF; --code-cmt:#7F86A0; --code-str:#E0B878;
+    --sans:"Space Grotesk",-apple-system,system-ui,sans-serif;
+    --serif:"Source Serif 4",Georgia,serif;
+    --mono:"JetBrains Mono",ui-monospace,monospace;
+    --wrap:1160px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--serif);
+    font-size:18px;line-height:1.72;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+
+  #progress{position:fixed;top:0;left:0;height:3px;width:0;background:var(--indigo);z-index:50;transition:width .08s linear}
+  .wrap{max-width:var(--wrap);margin:0 auto;padding:0 28px}
+
+  header{padding:64px 0 40px;border-bottom:1px solid var(--line)}
+  .hero{display:grid;grid-template-columns:1.15fr .85fr;gap:56px;align-items:center}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--indigo);font-weight:600}
+  h1{font-family:var(--sans);font-weight:600;font-size:clamp(34px,5.4vw,50px);line-height:1.04;letter-spacing:-.02em;margin:16px 0 18px}
+  h1 .u{color:var(--indigo)}
+  .lede{font-size:20px;color:#33384a;margin:0 0 22px;max-width:42ch}
+  .meta{display:flex;flex-wrap:wrap;gap:10px}
+  .chip{font-family:var(--mono);font-size:11.5px;letter-spacing:.03em;color:var(--muted);
+    background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 11px}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    box-shadow:0 1px 0 rgba(25,28,40,.03),0 18px 40px -28px rgba(25,28,40,.35);overflow:hidden}
+  .card .bar{display:flex;gap:6px;padding:12px 14px;border-bottom:1px solid var(--line);background:#FBFBFD}
+  .card .bar i{width:9px;height:9px;border-radius:50%;background:var(--line-strong)}
+  .turn{padding:13px 16px;border-bottom:1px solid var(--line);font-size:15px;line-height:1.5}
+  .turn:last-child{border-bottom:0}
+  .turn .txt{margin-top:6px;color:#2b3040;font-family:var(--mono);font-size:12.5px}
+
+  .role{display:inline-block;font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.05em;
+    text-transform:uppercase;padding:2px 8px;border-radius:5px;vertical-align:middle}
+  .r-usr{background:var(--indigo-tint);color:var(--indigo-dark)}
+  .r-match{background:var(--teal-tint);color:var(--teal-dark)}
+  .r-miss{background:var(--ochre-tint);color:var(--ochre-dark)}
+  .score{float:right;font-family:var(--mono);font-size:11px;color:var(--faint)}
+
+  .layout{display:grid;grid-template-columns:230px minmax(0,760px);gap:64px;justify-content:center;
+    padding:56px 0 40px;align-items:start}
+  nav.toc{position:sticky;top:26px;font-family:var(--mono);font-size:12.5px;line-height:1.5}
+  nav.toc .tl{color:var(--faint);letter-spacing:.14em;text-transform:uppercase;font-size:11px;margin-bottom:14px}
+  nav.toc a{display:block;color:var(--muted);text-decoration:none;padding:7px 0 7px 14px;
+    border-left:2px solid var(--line);transition:color .15s,border-color .15s}
+  nav.toc a:hover{color:var(--ink)}
+  nav.toc a.active{color:var(--indigo);border-left-color:var(--indigo);font-weight:600}
+  nav.toc a .n{color:var(--faint);margin-right:8px}
+  nav.toc a.active .n{color:var(--indigo)}
+
+  article{min-width:0}
+  section{margin-bottom:64px;scroll-margin-top:24px}
+  .step{font-family:var(--mono);font-size:12.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--indigo)}
+  .step .dot{color:var(--line-strong);margin:0 8px}
+  section h2{font-family:var(--sans);font-weight:600;font-size:29px;line-height:1.12;letter-spacing:-.015em;margin:12px 0 18px}
+  section h3{font-family:var(--sans);font-weight:600;font-size:18px;letter-spacing:-.01em;margin:30px 0 6px;color:var(--ink)}
+  p{margin:0 0 18px}
+  strong{font-weight:600;color:var(--ink)}
+  a{color:var(--indigo);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+  a:hover{text-decoration-thickness:2px}
+
+  code{font-family:var(--mono);font-size:.85em;background:var(--indigo-tint);color:var(--indigo-dark);
+    padding:1.5px 6px;border-radius:5px;word-break:break-word}
+  pre{margin:22px 0;background:var(--code-bg);border-radius:12px;padding:18px 20px;overflow-x:auto;border:1px solid #262a3b}
+  pre code{font-family:var(--mono);font-size:13.5px;line-height:1.7;background:none;color:var(--code-fg);padding:0;border-radius:0;white-space:pre}
+  .c-cmt{color:var(--code-cmt);font-style:italic}
+  .c-str{color:var(--code-str)}
+  .codecap{font-family:var(--mono);font-size:11.5px;color:var(--faint);margin:-10px 0 24px;letter-spacing:.02em}
+
+  .callout{border:1px solid var(--line);border-radius:12px;padding:16px 18px 6px;margin:22px 0;background:var(--surface)}
+  .callout .lab{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+    display:inline-block;padding:3px 9px;border-radius:6px;margin-bottom:8px}
+  .callout p{margin:0 0 12px;font-size:16.5px}
+  .plain{background:var(--ochre-tint);border-color:#EBD9A8}
+  .plain .lab{background:#F3E4BD;color:var(--ochre-dark)}
+  .tip{background:var(--indigo-tint);border-color:#D6D3EE}
+  .tip .lab{background:#DEDBF3;color:var(--indigo-dark)}
+  .vm{background:var(--teal-tint);border-color:#B7DED4}
+  .vm .lab{background:#CDEAE2;color:var(--teal-dark)}
+  .warn{background:var(--rose-tint);border-color:#F1CDD1}
+  .warn .lab{background:#F5D6DA;color:var(--rose-dark)}
+
+  .uses{margin:24px 0 6px}
+  .uses .lab{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--teal-dark)}
+  .uses ul{list-style:none;padding:0;margin:10px 0 0}
+  .uses li{position:relative;padding:6px 0 6px 22px;font-size:16.5px;border-bottom:1px solid var(--line)}
+  .uses li:last-child{border-bottom:0}
+  .uses li::before{content:"";position:absolute;left:2px;top:15px;width:7px;height:7px;border-radius:2px;background:var(--teal)}
+
+  .cards3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:24px 0}
+  .shot{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .shot h4{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--indigo-dark);margin:0 0 6px}
+  .shot p{font-size:14.5px;line-height:1.5;color:var(--muted);margin:0}
+  .shot .tag{font-family:var(--mono);font-size:10.5px;color:var(--teal-dark);display:block;margin-top:8px}
+
+  figure{margin:26px 0;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px 20px 10px}
+  figure svg{display:block;width:100%;height:auto}
+  figcaption{font-family:var(--mono);font-size:11.5px;color:var(--faint);text-align:center;margin-top:8px;letter-spacing:.02em}
+  .d-t{font-family:var(--sans);font-weight:500;font-size:14px;fill:var(--ink)}
+  .d-s{font-family:var(--serif);font-size:12.5px;fill:var(--muted)}
+  .d-lab{font-family:var(--mono);font-size:11px;letter-spacing:.06em;fill:var(--faint)}
+
+  footer{border-top:1px solid var(--line);padding:44px 0 72px;margin-top:8px}
+  .res{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px 0 0}
+  .res a{display:block;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;
+    text-decoration:none;color:var(--ink);transition:border-color .15s,transform .15s}
+  .res a:hover{border-color:var(--indigo);transform:translateY(-1px)}
+  .res .k{font-family:var(--mono);font-size:11px;color:var(--indigo);letter-spacing:.05em;display:block;margin-bottom:3px}
+  .res .d{font-size:14px;color:var(--muted);line-height:1.4}
+  .endnote{font-size:15px;color:var(--muted);margin-top:26px}
+
+  a:focus-visible,nav.toc a:focus-visible{outline:2px solid var(--indigo);outline-offset:3px;border-radius:3px}
+
+  @media (max-width:980px){ .layout{grid-template-columns:minmax(0,760px);gap:0} nav.toc{display:none} }
+  @media (max-width:720px){
+    .hero{grid-template-columns:1fr;gap:32px}
+    .cards3{grid-template-columns:1fr}
+    .res{grid-template-columns:1fr}
+    body{font-size:17px}
+    header{padding:44px 0 32px}
+  }
+  @media (prefers-reduced-motion:reduce){ html{scroll-behavior:auto} *{transition:none!important;animation:none!important} }
+</style>
+</head>
+<body>
+<div id="progress" aria-hidden="true"></div>
+
+<header>
+  <div class="wrap">
+    <div class="hero">
+      <div>
+        <span class="eyebrow">A hands-on tutorial · systems design</span>
+        <h1>The fastest query is<br><span class="u">the one you never run.</span></h1>
+        <p class="lede">A cache is a small, fast copy of expensive data. It can turn a 45 ms database trip into a 0.2 ms lookup — but it forces four hard decisions: how to read and write it, what to throw away, and how it behaves when everyone wants the same thing at once.</p>
+        <div class="meta">
+          <span class="chip">Beginner-friendly</span>
+          <span class="chip">Redis &amp; Java examples</span>
+          <span class="chip">~18 min read</span>
+        </div>
+      </div>
+      <div class="card" aria-label="Example of a cache hit and miss">
+        <div class="bar"><i></i><i></i><i></i></div>
+        <div class="turn"><span class="role r-usr">Request</span><div class="txt">GET user:42</div></div>
+        <div class="turn"><span class="role r-match">Cache hit</span><span class="score">0.2 ms</span><div class="txt">served from memory</div></div>
+        <div class="turn"><span class="role r-miss">Cache miss</span><span class="score">45 ms</span><div class="txt">fell through to the database</div></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+<div class="layout">
+
+  <nav class="toc" aria-label="Contents">
+    <div class="tl">On this page</div>
+    <a href="#start"><span class="n">00</span>Start here</a>
+    <a href="#strategies"><span class="n">01</span>Read &amp; write strategies</a>
+    <a href="#eviction"><span class="n">02</span>Eviction</a>
+    <a href="#stampede"><span class="n">03</span>Cache stampede</a>
+    <a href="#hotkeys"><span class="n">04</span>Hot keys</a>
+    <a href="#together"><span class="n">05</span>Putting it together</a>
+    <a href="#resources"><span class="n">→</span>Keep learning</a>
+  </nav>
+
+  <article>
+
+    <!-- 00 -->
+    <section id="start">
+      <span class="step">Start here</span>
+      <h2>Why cache — and what it costs you</h2>
+      <p>Some answers are expensive to produce: a heavy database join, a call to a slow service, a computed aggregate. If the same answer is asked for again and again, recomputing it every time is waste. A <strong>cache</strong> keeps a copy of the answer somewhere fast — usually memory — so the next reader gets it in microseconds instead of milliseconds. Done right, a cache both speeds up users and shields your database from load.</p>
+      <p>But a copy of the truth is not the truth. The moment you keep one, you inherit new problems: the copy can go <strong>stale</strong>, memory is finite so you must <strong>throw things away</strong>, and under load a cache can fail in surprising, cascading ways. As the old joke goes, there are only two hard things in computer science — cache invalidation and naming things.</p>
+      <p>This guide walks the four decisions that show up in every real caching design: <strong>how you read and write</strong> the cache, <strong>what you evict</strong> when it's full, and the two classic stress failures — <strong>cache stampede</strong> and <strong>hot keys</strong>. Redis (a distributed cache) and Caffeine (an in-process Java cache) are the running examples.</p>
+      <div class="callout tip">
+        <span class="lab">What this covers</span>
+        <p><strong>01</strong> read/write strategies (cache-aside, write-through, write-back…) · <strong>02</strong> eviction policies (LRU, LFU, and modern ones) · <strong>03</strong> cache stampede and how to prevent it · <strong>04</strong> the hot-key problem · <strong>05</strong> a layered setup that handles all of it.</p>
+      </div>
+    </section>
+
+    <!-- 01 -->
+    <section id="strategies">
+      <span class="step">01 <span class="dot">/</span> Reading &amp; writing</span>
+      <h2>Read &amp; write strategies</h2>
+
+      <div class="callout plain">
+        <span class="lab">In plain words</span>
+        <p>A strategy is just <strong>who talks to whom, and when</strong>. Does the app check the cache itself, or does the cache fetch on its behalf? When data changes, do you update the cache now or later? These choices trade freshness against speed.</p>
+      </div>
+
+      <h3>Reading: cache-aside &amp; read-through</h3>
+      <p>The default pattern is <strong>cache-aside</strong> (also "lazy loading"): the app checks the cache; on a miss it reads the database, then stores the result for next time. The app is in charge, and only data that's actually requested ever gets cached. <strong>Read-through</strong> is the same idea but the cache library does the fetching — you ask the cache, and it loads from the source on a miss behind the scenes.</p>
+
+      <figure aria-labelledby="ca-cap">
+        <svg viewBox="0 0 720 175" role="img" xmlns="http://www.w3.org/2000/svg">
+          <title>Cache-aside read path</title>
+          <desc>The app asks the cache. On a hit it returns immediately. On a miss it reads the database and stores the result with a TTL.</desc>
+          <defs>
+            <marker id="a-ca" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M2 1L8 5L2 9" fill="none" stroke="#5A6172" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </marker>
+          </defs>
+          <rect x="40" y="64" width="120" height="64" rx="10" fill="#ECEBF6" stroke="#C6C2E6"/>
+          <text class="d-t" x="100" y="96" text-anchor="middle" dominant-baseline="central" fill="#2A2870">App</text>
+          <rect x="250" y="64" width="150" height="64" rx="10" fill="#E1F0EC" stroke="#A9D5CB"/>
+          <text class="d-t" x="325" y="88" text-anchor="middle" dominant-baseline="central" fill="#0E4F4B">Cache</text>
+          <text class="d-s" x="325" y="106" text-anchor="middle" dominant-baseline="central" fill="#3B6E68">in-memory</text>
+          <rect x="500" y="64" width="170" height="64" rx="10" fill="#FBF1DC" stroke="#EBD9A8"/>
+          <text class="d-t" x="585" y="88" text-anchor="middle" dominant-baseline="central" fill="#7A4E00">Database</text>
+          <text class="d-s" x="585" y="106" text-anchor="middle" dominant-baseline="central" fill="#8A6B2E">slow source</text>
+          <line x1="160" y1="90" x2="246" y2="90" stroke="#5A6172" stroke-width="1.4" marker-end="url(#a-ca)"/>
+          <text class="d-s" x="203" y="80" text-anchor="middle">1 get(key)</text>
+          <line x1="400" y1="90" x2="496" y2="90" stroke="#5A6172" stroke-width="1.4" marker-end="url(#a-ca)"/>
+          <text class="d-s" x="448" y="80" text-anchor="middle">3 read on miss</text>
+          <line x1="246" y1="112" x2="164" y2="112" stroke="#14746F" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#a-ca)"/>
+          <text class="d-s" x="205" y="128" text-anchor="middle" fill="#0E4F4B">2 hit &#8594; value</text>
+          <line x1="496" y1="112" x2="404" y2="112" stroke="#A66A00" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#a-ca)"/>
+          <text class="d-s" x="450" y="128" text-anchor="middle" fill="#7A4E00">4 store + TTL</text>
+          <text class="d-s" x="325" y="156" text-anchor="middle">hit? return now.  miss? load, then cache it.</text>
+        </svg>
+        <figcaption id="ca-cap">Cache-aside: the app checks the cache, falls back to the database on a miss, and stores the result for next time.</figcaption>
+      </figure>
+
+      <pre><code><span class="c-cmt"># cache-aside read</span>
+def get_user(id):
+    v = cache.get(id)
+    if v is not None:                 <span class="c-cmt"># hit</span>
+        return v
+    v = db.load(id)                   <span class="c-cmt"># miss -> read the source</span>
+    cache.set(id, v, ttl=300)         <span class="c-cmt"># populate for next time</span>
+    return v</code></pre>
+
+      <h3>Writing: three ways to keep the copy honest</h3>
+      <p>When data changes, the write strategy decides how the cache and database stay in step:</p>
+      <div class="cards3">
+        <div class="shot"><h4>Write-through</h4><p>Write to cache and database together, synchronously. The cache is always fresh; writes are a little slower.</p><span class="tag">safest · slower writes</span></div>
+        <div class="shot"><h4>Write-back</h4><p>Write to cache now, flush to the database later in batches. Very fast writes, but data is at risk if the cache dies first.</p><span class="tag">fastest · riskier</span></div>
+        <div class="shot"><h4>Write-around</h4><p>Write straight to the database, skip the cache. Good when written data is rarely read back soon.</p><span class="tag">avoids cache churn</span></div>
+      </div>
+
+      <h3>The freshness knob: TTL &amp; invalidation</h3>
+      <p>Almost every cached entry carries a <strong>TTL</strong> (time-to-live) — after it expires, the entry is dropped and the next read reloads fresh data. TTL is the simplest form of invalidation: you accept that data can be stale for up to its TTL in exchange for not having to track every change. When correctness matters more, you also <strong>invalidate on write</strong> — actively delete or update the cached entry the moment the source changes. There's a fourth pattern worth knowing, <strong>refresh-ahead</strong>: reload popular entries in the background <em>before</em> they expire, so readers never hit a miss (this idea reappears in section 03).</p>
+    </section>
+
+    <!-- 02 -->
+    <section id="eviction">
+      <span class="step">02 <span class="dot">/</span> What to throw away</span>
+      <h2>Eviction</h2>
+
+      <div class="callout plain">
+        <span class="lab">In plain words</span>
+        <p>A cache is a small shelf, not a warehouse. When it's full and something new arrives, you must take something off the shelf. An <strong>eviction policy</strong> is your rule for deciding <em>what to remove</em> — and a good rule keeps the things you're about to need and drops the things you won't.</p>
+      </div>
+
+      <h3>The score: hit ratio</h3>
+      <p>Eviction is judged by one number: the <strong>hit ratio</strong> — the fraction of reads served from cache. A higher hit ratio means fewer trips to the slow source. The whole game is choosing what to keep so that future reads are hits.</p>
+
+      <h3>The classic policies</h3>
+      <p>The workhorses are <strong>LRU</strong> (evict the <em>least recently used</em> — assumes what you touched lately you'll touch again) and <strong>LFU</strong> (evict the <em>least frequently used</em> — keeps popular items even if not touched recently). Simpler ones include <strong>FIFO</strong> (evict the oldest inserted), <strong>random</strong>, and pure <strong>TTL</strong> (evict whatever's expiring soonest). LRU is the sensible default for the common case where a small set of items is far more popular than the rest.</p>
+
+      <figure aria-labelledby="lru-cap">
+        <svg viewBox="0 0 720 160" role="img" xmlns="http://www.w3.org/2000/svg">
+          <title>LRU eviction</title>
+          <desc>The cache holds four items ordered by recency. A new item is inserted at the front, pushing out the least recently used item at the back.</desc>
+          <defs>
+            <marker id="a-lru" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M2 1L8 5L2 9" fill="none" stroke="#5A6172" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </marker>
+          </defs>
+          <text class="d-lab" x="40" y="30">LRU — EVICT THE LEAST-RECENTLY-USED</text>
+          <rect x="40" y="64" width="84" height="48" rx="8" fill="#E1F0EC" stroke="#A9D5CB"/>
+          <text class="d-t" x="82" y="82" text-anchor="middle" dominant-baseline="central" fill="#0E4F4B">E</text>
+          <text class="d-s" x="82" y="100" text-anchor="middle" dominant-baseline="central" fill="#3B6E68">new</text>
+          <line x1="124" y1="88" x2="178" y2="88" stroke="#5A6172" stroke-width="1.4" marker-end="url(#a-lru)"/>
+          <text class="d-s" x="151" y="78" text-anchor="middle">insert</text>
+          <rect x="186" y="56" width="372" height="64" rx="12" fill="#FBFBFD" stroke="#E2E4EC"/>
+          <rect x="194" y="66" width="84" height="44" rx="8" fill="#ECEBF6" stroke="#C6C2E6"/>
+          <text class="d-t" x="236" y="88" text-anchor="middle" dominant-baseline="central" fill="#2A2870">D</text>
+          <rect x="284" y="66" width="84" height="44" rx="8" fill="#ECEBF6" stroke="#C6C2E6"/>
+          <text class="d-t" x="326" y="88" text-anchor="middle" dominant-baseline="central" fill="#2A2870">C</text>
+          <rect x="374" y="66" width="84" height="44" rx="8" fill="#ECEBF6" stroke="#C6C2E6"/>
+          <text class="d-t" x="416" y="88" text-anchor="middle" dominant-baseline="central" fill="#2A2870">B</text>
+          <rect x="464" y="66" width="84" height="44" rx="8" fill="#FBE9EB" stroke="#F1CDD1"/>
+          <text class="d-t" x="506" y="88" text-anchor="middle" dominant-baseline="central" fill="#822833">A</text>
+          <text class="d-s" x="236" y="136" text-anchor="middle">most recent</text>
+          <text class="d-s" x="506" y="136" text-anchor="middle">least recent</text>
+          <line x1="558" y1="88" x2="612" y2="88" stroke="#5A6172" stroke-width="1.4" marker-end="url(#a-lru)"/>
+          <text class="d-s" x="585" y="78" text-anchor="middle">evict</text>
+          <rect x="620" y="64" width="80" height="48" rx="8" fill="#F1EFE8" stroke="#D3D1C7"/>
+          <text class="d-t" x="660" y="82" text-anchor="middle" dominant-baseline="central" fill="#5F5E5A">A</text>
+          <text class="d-s" x="660" y="100" text-anchor="middle" dominant-baseline="central" fill="#888780">gone</text>
+        </svg>
+        <figcaption id="lru-cap">A hit moves an item to the front; when the cache is full, a new item pushes out the one at the back — the least recently used.</figcaption>
+      </figure>
+
+      <h3>The modern policies</h3>
+      <p>Research has moved past plain LRU. <strong>W-TinyLFU</strong> (used by Java's Caffeine) keeps a tiny recency window in front of a frequency-based main cache, using a compact counter sketch to admit only items that earn their place — it lands near the theoretical best hit ratio on mixed workloads. <strong>S3-FIFO</strong> (2023) uses three FIFO queues to cheaply throw out "one-hit wonders," and often beats LRU while being far more scalable under many CPU cores. <strong>ARC</strong> and <strong>2Q</strong> adaptively balance recency and frequency. You rarely implement these yourself — you get them from your cache library — but knowing the names helps you pick the right tool.</p>
+
+      <div class="callout vm">
+        <span class="lab">In Redis</span>
+        <p>Redis picks an eviction rule with <code>maxmemory-policy</code>. There are eight: <code>noeviction</code> (reject writes when full) plus LRU / LFU / random / TTL variants, each in an <code>allkeys-*</code> flavour (any key) or a <code>volatile-*</code> flavour (only keys with a TTL). Its LRU and LFU are <strong>sampled approximations</strong>, not exact — cheaper, and tunable via <code>maxmemory-samples</code>. Use <code>allkeys-lru</code> as a safe default; switch to <code>allkeys-lfu</code> when you have viral spikes and want to protect frequently-read items.</p>
+      </div>
+
+      <pre><code>maxmemory 4gb
+maxmemory-policy allkeys-lru      <span class="c-cmt"># evict least-recently-used across all keys</span>
+maxmemory-samples 10              <span class="c-cmt"># higher = closer to true LRU (default 5)</span>
+<span class="c-cmt"># watch: evicted_keys, keyspace_hits, keyspace_misses (INFO stats)</span></code></pre>
+
+      <div class="callout vm">
+        <span class="lab">In Java (Caffeine)</span>
+        <p>Caffeine is an in-process cache built on <strong>W-TinyLFU</strong>. You just set a maximum size and it manages admission and eviction for you — no policy to hand-tune, and near-optimal hit ratios out of the box.</p>
+      </div>
+    </section>
+
+    <!-- 03 -->
+    <section id="stampede">
+      <span class="step">03 <span class="dot">/</span> Failure under load, part 1</span>
+      <h2>Cache stampede</h2>
+
+      <div class="callout plain">
+        <span class="lab">In plain words</span>
+        <p>Picture a popular page served from cache — the database barely notices. Then the cached entry expires. In that instant the safety net vanishes for <em>everyone at once</em>: thousands of requests all miss, all race to rebuild the same value, and all slam the database together. That sudden flood is a <strong>cache stampede</strong> (also "thundering herd" or "dogpile").</p>
+      </div>
+
+      <h3>Why it's dangerous</h3>
+      <p>A key read 10,000 times a second is fine while it's cached — the database sees almost nothing. The microsecond it expires, those 10,000 requests become 10,000 identical expensive queries in one second. If that query is a heavy join or an external call, the database can fall over, requests pile up, and the failure cascades. The cruel irony: the cache was protecting the backend right up until it didn't.</p>
+
+      <figure aria-labelledby="st-cap">
+        <svg viewBox="0 0 720 290" role="img" xmlns="http://www.w3.org/2000/svg">
+          <title>Cache stampede and the single-flight fix</title>
+          <desc>Without protection, an expired key causes many requests to flood the database. With single-flight, one request refills the cache while the rest wait or serve stale.</desc>
+          <defs>
+            <marker id="a-st" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M2 1L8 5L2 9" fill="none" stroke="#5A6172" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </marker>
+          </defs>
+          <text class="d-lab" x="40" y="32">WITHOUT PROTECTION — THE HERD</text>
+          <rect x="40" y="52" width="140" height="56" rx="10" fill="#FBF1DC" stroke="#EBD9A8"/>
+          <text class="d-t" x="110" y="74" text-anchor="middle" dominant-baseline="central" fill="#7A4E00">10k requests</text>
+          <text class="d-s" x="110" y="92" text-anchor="middle" dominant-baseline="central" fill="#8A6B2E">same key</text>
+          <line x1="180" y1="80" x2="246" y2="80" stroke="#5A6172" stroke-width="1.4" marker-end="url(#a-st)"/>
+          <rect x="250" y="52" width="140" height="56" rx="10" fill="#FBE9EB" stroke="#F1CDD1"/>
+          <text class="d-t" x="320" y="74" text-anchor="middle" dominant-baseline="central" fill="#822833">Cache</text>
+          <text class="d-s" x="320" y="92" text-anchor="middle" dominant-baseline="central" fill="#822833">key expired</text>
+          <line x1="392" y1="62" x2="496" y2="62" stroke="#B23A48" stroke-width="1.2" marker-end="url(#a-st)"/>
+          <line x1="392" y1="72" x2="496" y2="72" stroke="#B23A48" stroke-width="1.2" marker-end="url(#a-st)"/>
+          <line x1="392" y1="82" x2="496" y2="82" stroke="#B23A48" stroke-width="1.2" marker-end="url(#a-st)"/>
+          <line x1="392" y1="92" x2="496" y2="92" stroke="#B23A48" stroke-width="1.2" marker-end="url(#a-st)"/>
+          <line x1="392" y1="102" x2="496" y2="102" stroke="#B23A48" stroke-width="1.2" marker-end="url(#a-st)"/>
+          <rect x="500" y="44" width="180" height="72" rx="10" fill="#FBE9EB" stroke="#F1CDD1"/>
+          <text class="d-t" x="590" y="72" text-anchor="middle" dominant-baseline="central" fill="#822833">Database</text>
+          <text class="d-s" x="590" y="92" text-anchor="middle" dominant-baseline="central" fill="#822833">overwhelmed</text>
+          <text class="d-s" x="443" y="132" text-anchor="middle">all miss &#8594; flood</text>
+
+          <text class="d-lab" x="40" y="182">WITH SINGLE-FLIGHT — ONE LOADER</text>
+          <rect x="40" y="200" width="140" height="56" rx="10" fill="#FBF1DC" stroke="#EBD9A8"/>
+          <text class="d-t" x="110" y="222" text-anchor="middle" dominant-baseline="central" fill="#7A4E00">10k requests</text>
+          <text class="d-s" x="110" y="240" text-anchor="middle" dominant-baseline="central" fill="#8A6B2E">same key</text>
+          <line x1="180" y1="228" x2="246" y2="228" stroke="#5A6172" stroke-width="1.4" marker-end="url(#a-st)"/>
+          <rect x="250" y="200" width="140" height="56" rx="10" fill="#E1F0EC" stroke="#A9D5CB"/>
+          <text class="d-t" x="320" y="222" text-anchor="middle" dominant-baseline="central" fill="#0E4F4B">Cache</text>
+          <text class="d-s" x="320" y="240" text-anchor="middle" dominant-baseline="central" fill="#3B6E68">miss</text>
+          <line x1="392" y1="228" x2="496" y2="228" stroke="#2E7D46" stroke-width="1.6" marker-end="url(#a-st)"/>
+          <text class="d-s" x="444" y="218" text-anchor="middle" fill="#1E5A31">1 loader</text>
+          <rect x="500" y="200" width="180" height="56" rx="10" fill="#E6F2E9" stroke="#AED6BB"/>
+          <text class="d-t" x="590" y="222" text-anchor="middle" dominant-baseline="central" fill="#1E5A31">Database</text>
+          <text class="d-s" x="590" y="240" text-anchor="middle" dominant-baseline="central" fill="#3E7A52">one query</text>
+          <text class="d-s" x="320" y="278" text-anchor="middle">others wait, or serve stale</text>
+        </svg>
+        <figcaption id="st-cap">When a hot key expires, every request misses at once and floods the origin. Single-flight lets one request refill it while the rest wait or serve stale.</figcaption>
+      </figure>
+
+      <h3>The defenses</h3>
+      <p>You can't stop the key from expiring, but you can make regeneration happen <em>once</em> instead of thousands of times. The main tools, from simplest to most surgical:</p>
+      <p><strong>TTL jitter</strong> — randomize each TTL by a few percent so entries don't all expire on the same tick. The cheapest fix, and a good default everywhere. <strong>Single-flight / locking</strong> — let exactly one request rebuild a key while the others wait for its result (or serve stale); with a distributed lock this coordinates across servers. <strong>Stale-while-revalidate</strong> — serve the slightly-expired value instantly while one background task refreshes it, so users never see a miss at all. <strong>Probabilistic early expiration (XFetch)</strong> — from the paper <em>Optimal Probabilistic Cache Stampede Prevention</em>: each reader occasionally volunteers to refresh a key <em>just before</em> it expires, with the chance rising as expiry nears, so the refresh happens off-peak and never as a synchronized cliff. And <strong>cache warming</strong> — pre-load known-hot keys after a restart so you don't start cold.</p>
+
+      <pre><code><span class="c-cmt"># single-flight + jittered TTL</span>
+def get(key):
+    v = cache.get(key)
+    if v is not None:
+        return v
+    with lock_for(key):               <span class="c-cmt"># only ONE loader per key</span>
+        v = cache.get(key)            <span class="c-cmt"># re-check: someone may have filled it</span>
+        if v is not None:
+            return v
+        v = db.load(key)              <span class="c-cmt"># the single expensive fetch</span>
+        cache.set(key, v, ttl=jitter(300))
+        return v
+
+def jitter(base):
+    return base + random.uniform(0, base * 0.1)   <span class="c-cmt"># spread expiries by up to 10%</span></code></pre>
+
+      <div class="callout tip">
+        <span class="lab">Rule of thumb</span>
+        <p>Add TTL jitter to everything, single-flight to expensive keys, and stale-while-revalidate to read-heavy pages. And never let your backend <em>depend</em> on the cache to survive — design so a cold or empty cache degrades gracefully instead of collapsing.</p>
+      </div>
+    </section>
+
+    <!-- 04 -->
+    <section id="hotkeys">
+      <span class="step">04 <span class="dot">/</span> Failure under load, part 2</span>
+      <h2>Hot keys</h2>
+
+      <div class="callout plain">
+        <span class="lab">In plain words</span>
+        <p>A distributed cache spreads keys across many nodes by hashing each key to one node. That's great when traffic is spread evenly. But if one key goes viral — a celebrity profile, a livestream's stats, <code>product:iphone</code> during a launch — <strong>all</strong> its traffic lands on the single node that owns it. That node saturates while every other node sits idle. That's a <strong>hot key</strong>.</p>
+      </div>
+
+      <h3>Why adding nodes doesn't help</h3>
+      <p>This is the key insight: a hot key is a <strong>load-distribution problem, not a capacity problem</strong>. One key hashes to one node, so no matter how many nodes you add, that one key still lives on one of them. You'll see one shard pinned at 98% CPU with 800 ms latency while the rest of the cluster is bored. The fix isn't more nodes — it's spreading the <em>one key's</em> traffic.</p>
+
+      <figure aria-labelledby="hk-cap">
+        <svg viewBox="0 0 720 300" role="img" xmlns="http://www.w3.org/2000/svg">
+          <title>Hot key problem and mitigation</title>
+          <desc>All traffic for one key hits a single shard, saturating it while others idle. A local cache absorbs most reads and splitting the key into copies spreads the rest across shards.</desc>
+          <defs>
+            <marker id="a-hk" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M2 1L8 5L2 9" fill="none" stroke="#5A6172" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </marker>
+          </defs>
+          <text class="d-lab" x="40" y="30">HOT KEY — ONE SHARD SATURATES</text>
+          <rect x="40" y="60" width="130" height="56" rx="10" fill="#FBF1DC" stroke="#EBD9A8"/>
+          <text class="d-t" x="105" y="82" text-anchor="middle" dominant-baseline="central" fill="#7A4E00">clients</text>
+          <text class="d-s" x="105" y="100" text-anchor="middle" dominant-baseline="central" fill="#8A6B2E">all read K</text>
+          <line x1="170" y1="88" x2="464" y2="63" stroke="#B23A48" stroke-width="1.6" marker-end="url(#a-hk)"/>
+          <text class="d-s" x="315" y="74" text-anchor="middle">key K &#8594; one node</text>
+          <rect x="468" y="44" width="190" height="38" rx="8" fill="#FBE9EB" stroke="#F1CDD1"/>
+          <text class="d-t" x="563" y="63" text-anchor="middle" dominant-baseline="central" fill="#822833">shard 1 · 98% CPU</text>
+          <rect x="468" y="90" width="190" height="38" rx="8" fill="#F1EFE8" stroke="#D3D1C7"/>
+          <text class="d-t" x="563" y="109" text-anchor="middle" dominant-baseline="central" fill="#5F5E5A">shard 2 · idle</text>
+          <rect x="468" y="136" width="190" height="38" rx="8" fill="#F1EFE8" stroke="#D3D1C7"/>
+          <text class="d-t" x="563" y="155" text-anchor="middle" dominant-baseline="central" fill="#5F5E5A">shard 3 · idle</text>
+
+          <text class="d-lab" x="40" y="210">SPREAD IT — LOCAL CACHE + KEY FAN-OUT</text>
+          <rect x="40" y="234" width="110" height="52" rx="10" fill="#FBF1DC" stroke="#EBD9A8"/>
+          <text class="d-t" x="95" y="260" text-anchor="middle" dominant-baseline="central" fill="#7A4E00">clients</text>
+          <line x1="150" y1="260" x2="174" y2="260" stroke="#5A6172" stroke-width="1.4" marker-end="url(#a-hk)"/>
+          <rect x="182" y="234" width="140" height="52" rx="10" fill="#E1F0EC" stroke="#A9D5CB"/>
+          <text class="d-t" x="252" y="256" text-anchor="middle" dominant-baseline="central" fill="#0E4F4B">L1 local cache</text>
+          <text class="d-s" x="252" y="274" text-anchor="middle" dominant-baseline="central" fill="#3B6E68">serves hot key</text>
+          <line x1="322" y1="260" x2="462" y2="260" stroke="#5A6172" stroke-width="1.4" marker-end="url(#a-hk)"/>
+          <text class="d-s" x="392" y="250" text-anchor="middle">few misses</text>
+          <rect x="470" y="230" width="190" height="60" rx="10" fill="#ECEBF6" stroke="#C6C2E6"/>
+          <text class="d-t" x="565" y="254" text-anchor="middle" dominant-baseline="central" fill="#2A2870">K &#8594; K#0 … K#n</text>
+          <text class="d-s" x="565" y="272" text-anchor="middle" dominant-baseline="central" fill="#5A5484">shared across shards</text>
+        </svg>
+        <figcaption id="hk-cap">A hot key overloads the shard that owns it. An in-process L1 cache absorbs most reads; splitting the key into copies spreads the rest across shards.</figcaption>
+      </figure>
+
+      <h3>The defenses</h3>
+      <div class="uses">
+        <span class="lab">How to spread a hot key</span>
+        <ul>
+          <li><strong>Local (L1) cache:</strong> each app server keeps a small in-process cache in front of the distributed one. Hot keys are served locally with zero network calls — briefly stale, but usually fine.</li>
+          <li><strong>Key splitting / fan-out:</strong> store the value under N copies (<code>K#0 … K#n</code>); writes update all copies, reads pick one at random. This spreads read load nearly linearly across shards.</li>
+          <li><strong>Read replicas:</strong> add replicas of the hot shard and route reads to them (eventually consistent — a small replication lag is usually acceptable for a cache).</li>
+          <li><strong>Edge / request coalescing:</strong> at a CDN or L7 proxy, collapse many identical concurrent requests into one backend fetch.</li>
+          <li><strong>Detect early:</strong> monitor per-key traffic so you can promote a rising key to a local cache before it takes a node down.</li>
+        </ul>
+      </div>
+
+      <pre><code><span class="c-cmt"># key fan-out: keep N copies of the hot value, spread reads across shards</span>
+N = 5
+for i in range(N):                          <span class="c-cmt"># write: update every copy</span>
+    cache.set(f"trending:page:{i}", value, ttl=60)
+
+i = random.randrange(N)                     <span class="c-cmt"># read: pick a random copy</span>
+value = cache.get(f"trending:page:{i}")</code></pre>
+
+      <div class="callout warn">
+        <span class="lab">Don't confuse the two</span>
+        <p>A <strong>stampede</strong> concentrates in <em>time</em> — many requests miss the same key at the same moment (on expiry). A <strong>hot key</strong> concentrates in <em>space</em> — sustained traffic pins one key to one node. They can strike together (a hot key that expires is the worst case), so a real hot-key setup usually pairs an L1 cache with single-flight. Note too that fan-out and replicas scale <em>reads</em>; a write-heavy hot key is bounded by a single primary, so there the fix is reducing write volume in the client.</p>
+      </div>
+    </section>
+
+    <!-- 05 -->
+    <section id="together">
+      <span class="step">05 <span class="dot">/</span> Putting it together</span>
+      <h2>A cache that survives the real world</h2>
+      <p>Stack the defenses in layers. An <strong>L1 in-process cache</strong> (bounded, W-TinyLFU) catches the hottest keys with no network hop. Behind it, a <strong>distributed cache</strong> (Redis, with a sensible <code>maxmemory-policy</code>) holds the shared working set. Every entry uses <strong>cache-aside with single-flight and a jittered TTL</strong>, and read-heavy entries add <strong>stale-while-revalidate</strong>. You watch the <strong>hit ratio</strong> and <strong>eviction rate</strong> to know if the cache is the right size.</p>
+
+      <p>The nice part: a good library gives you most of this for free. Java's Caffeine, in a few lines, is a bounded cache with modern eviction, built-in single-flight (concurrent loads for one key are coalesced into a single call), and background refresh-ahead:</p>
+
+      <pre><code>LoadingCache&lt;Long, User&gt; users = Caffeine.newBuilder()
+    .maximumSize(100_000)                       <span class="c-cmt">// bounded -&gt; eviction (W-TinyLFU)</span>
+    .refreshAfterWrite(Duration.ofMinutes(5))   <span class="c-cmt">// async refresh -&gt; no stampede</span>
+    .expireAfterWrite(Duration.ofMinutes(30))   <span class="c-cmt">// hard TTL</span>
+    .recordStats()                              <span class="c-cmt">// exposes the hit ratio</span>
+    .build(userRepo::findById);                 <span class="c-cmt">// loader; concurrent loads are coalesced</span>
+
+User u = users.get(userId);   <span class="c-cmt">// a hit, or a single de-duplicated load on a miss</span></code></pre>
+      <p class="codecap">Bounded eviction, single-flight, and refresh-ahead — the whole checklist below, in one builder.</p>
+
+      <div class="uses">
+        <span class="lab">Production checklist</span>
+        <ul>
+          <li>Default to <strong>cache-aside</strong>; add TTLs and invalidate on write when correctness matters.</li>
+          <li><strong>Jitter every TTL</strong> so expirations don't synchronize.</li>
+          <li><strong>Single-flight</strong> expensive keys; <strong>stale-while-revalidate</strong> read-heavy ones.</li>
+          <li>Bound the cache and pick an eviction policy; <strong>size it by hit ratio</strong>, not by guesswork.</li>
+          <li>Put an <strong>L1 local cache</strong> in front for hot keys; split or replicate the truly hot ones.</li>
+          <li>Monitor <strong>hit ratio, evictions, and per-key traffic</strong> — and make sure a cold cache degrades, not collapses.</li>
+        </ul>
+      </div>
+    </section>
+
+    <footer id="resources">
+      <span class="step">Keep learning</span>
+      <h2 style="margin-top:12px">Sources &amp; deeper dives</h2>
+      <p>The specifics here are grounded in official docs and primary sources. Best next stops:</p>
+      <div class="res">
+        <a href="https://redis.io/docs/latest/develop/reference/eviction/">
+          <span class="k">Redis docs · Key eviction</span><span class="d">The eight maxmemory policies and how approximate LRU/LFU work.</span></a>
+        <a href="https://redis.io/tutorials/redis-anti-patterns-every-developer-should-avoid/">
+          <span class="k">Redis · Anti-patterns</span><span class="d">The hot-key anti-pattern and other traps to avoid at scale.</span></a>
+        <a href="https://docs.aws.amazon.com/whitepapers/latest/database-caching-strategies-using-redis/welcome.html">
+          <span class="k">AWS whitepaper · Caching strategies</span><span class="d">Cache-aside, write-through/behind, TTLs, and evictions, end to end.</span></a>
+        <a href="https://github.com/ben-manes/caffeine/wiki/Efficiency">
+          <span class="k">Caffeine wiki · Efficiency</span><span class="d">W-TinyLFU explained, with hit-ratio comparisons against LRU and LFU.</span></a>
+        <a href="https://s3fifo.com/">
+          <span class="k">Paper · S3-FIFO (SOSP 2023)</span><span class="d">"FIFO queues are all you need for cache eviction" — the modern challenger to LRU.</span></a>
+        <a href="https://www.vldb.org/pvldb/vol8/p886-vattani.pdf">
+          <span class="k">Paper · XFetch (VLDB 2015)</span><span class="d">"Optimal Probabilistic Cache Stampede Prevention" — the early-expiry math.</span></a>
+      </div>
+      <p class="endnote">Best way to learn: put a cache-aside layer in front of one slow query, add a jittered TTL, then load-test it with the key expiring under traffic. Watch your database QPS spike — then add single-flight and watch it flatten. That before/after is the whole chapter in one graph.</p>
+    </footer>
+
+  </article>
+</div>
+</div>
+
+<script>
+  var bar = document.getElementById('progress');
+  function onScroll(){
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var pct = max > 0 ? (h.scrollTop || document.body.scrollTop) / max * 100 : 0;
+    bar.style.width = pct + '%';
+  }
+  document.addEventListener('scroll', onScroll, {passive:true});
+  onScroll();
+
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+  var map = {};
+  links.forEach(function(a){ map[a.getAttribute('href').slice(1)] = a; });
+  if ('IntersectionObserver' in window){
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if (e.isIntersecting){
+          links.forEach(function(a){ a.classList.remove('active'); });
+          var active = map[e.target.id];
+          if (active) active.classList.add('active');
+        }
+      });
+    }, {rootMargin:'-20% 0px -70% 0px', threshold:0});
+    document.querySelectorAll('article section, article footer').forEach(function(s){
+      if (s.id) obs.observe(s);
+    });
+  }
+</script>
+</body>
+</html>

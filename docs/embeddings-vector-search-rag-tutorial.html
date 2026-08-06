@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Embeddings, Vector Search & RAG — a Claude tutorial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F3F4F8; --surface:#FFFFFF;
+    --ink:#191C28; --muted:#5A6172; --faint:#8A90A0;
+    --line:#E2E4EC; --line-strong:#CFD3DE;
+    --indigo:#3D3A98; --indigo-dark:#2A2870; --indigo-tint:#ECEBF6;
+    --teal:#14746F; --teal-dark:#0E4F4B; --teal-tint:#E1F0EC;
+    --ochre:#A66A00; --ochre-dark:#7A4E00; --ochre-tint:#FBF1DC;
+    --green:#2E7D46; --green-dark:#1E5A31; --green-tint:#E6F2E9;
+    --rose:#B23A48; --rose-dark:#822833; --rose-tint:#FBE9EB;
+    --slate:#33384A; --slate-tint:#EBECF0;
+    --code-bg:#1B1E2B; --code-fg:#E7E8EF; --code-cmt:#7F86A0; --code-str:#E0B878;
+    --sans:"Space Grotesk",-apple-system,system-ui,sans-serif;
+    --serif:"Source Serif 4",Georgia,serif;
+    --mono:"JetBrains Mono",ui-monospace,monospace;
+    --wrap:1160px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--serif);
+    font-size:18px;line-height:1.72;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+
+  #progress{position:fixed;top:0;left:0;height:3px;width:0;background:var(--indigo);z-index:50;transition:width .08s linear}
+  .wrap{max-width:var(--wrap);margin:0 auto;padding:0 28px}
+
+  header{padding:64px 0 40px;border-bottom:1px solid var(--line)}
+  .hero{display:grid;grid-template-columns:1.15fr .85fr;gap:56px;align-items:center}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--indigo);font-weight:600}
+  h1{font-family:var(--sans);font-weight:600;font-size:clamp(34px,5.4vw,50px);line-height:1.04;letter-spacing:-.02em;margin:16px 0 18px}
+  h1 .u{color:var(--indigo)}
+  .lede{font-size:20px;color:#33384a;margin:0 0 22px;max-width:40ch}
+  .meta{display:flex;flex-wrap:wrap;gap:10px}
+  .chip{font-family:var(--mono);font-size:11.5px;letter-spacing:.03em;color:var(--muted);
+    background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 11px}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    box-shadow:0 1px 0 rgba(25,28,40,.03),0 18px 40px -28px rgba(25,28,40,.35);overflow:hidden}
+  .card .bar{display:flex;gap:6px;padding:12px 14px;border-bottom:1px solid var(--line);background:#FBFBFD}
+  .card .bar i{width:9px;height:9px;border-radius:50%;background:var(--line-strong)}
+  .turn{padding:13px 16px;border-bottom:1px solid var(--line);font-size:15px;line-height:1.5}
+  .turn:last-child{border-bottom:0}
+  .turn .txt{margin-top:6px;color:#2b3040}
+
+  .role{display:inline-block;font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.05em;
+    text-transform:uppercase;padding:2px 8px;border-radius:5px;vertical-align:middle}
+  .r-usr{background:var(--ochre-tint);color:var(--ochre-dark)}
+  .r-match{background:var(--teal-tint);color:var(--teal-dark)}
+  .score{float:right;font-family:var(--mono);font-size:11px;color:var(--faint)}
+
+  .layout{display:grid;grid-template-columns:230px minmax(0,760px);gap:64px;justify-content:center;
+    padding:56px 0 40px;align-items:start}
+  nav.toc{position:sticky;top:26px;font-family:var(--mono);font-size:12.5px;line-height:1.5}
+  nav.toc .tl{color:var(--faint);letter-spacing:.14em;text-transform:uppercase;font-size:11px;margin-bottom:14px}
+  nav.toc a{display:block;color:var(--muted);text-decoration:none;padding:7px 0 7px 14px;
+    border-left:2px solid var(--line);transition:color .15s,border-color .15s}
+  nav.toc a:hover{color:var(--ink)}
+  nav.toc a.active{color:var(--indigo);border-left-color:var(--indigo);font-weight:600}
+  nav.toc a .n{color:var(--faint);margin-right:8px}
+  nav.toc a.active .n{color:var(--indigo)}
+
+  article{min-width:0}
+  section{margin-bottom:64px;scroll-margin-top:24px}
+  .step{font-family:var(--mono);font-size:12.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--indigo)}
+  .step .dot{color:var(--line-strong);margin:0 8px}
+  section h2{font-family:var(--sans);font-weight:600;font-size:29px;line-height:1.12;letter-spacing:-.015em;margin:12px 0 18px}
+  section h3{font-family:var(--sans);font-weight:600;font-size:18px;letter-spacing:-.01em;margin:30px 0 6px;color:var(--ink)}
+  p{margin:0 0 18px}
+  strong{font-weight:600;color:var(--ink)}
+  a{color:var(--indigo);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+  a:hover{text-decoration-thickness:2px}
+
+  code{font-family:var(--mono);font-size:.85em;background:var(--indigo-tint);color:var(--indigo-dark);
+    padding:1.5px 6px;border-radius:5px;word-break:break-word}
+  pre{margin:22px 0;background:var(--code-bg);border-radius:12px;padding:18px 20px;overflow-x:auto;border:1px solid #262a3b}
+  pre code{font-family:var(--mono);font-size:13.5px;line-height:1.7;background:none;color:var(--code-fg);padding:0;border-radius:0;white-space:pre}
+  .c-cmt{color:var(--code-cmt);font-style:italic}
+  .c-str{color:var(--code-str)}
+  .codecap{font-family:var(--mono);font-size:11.5px;color:var(--faint);margin:-10px 0 24px;letter-spacing:.02em}
+
+  .callout{border:1px solid var(--line);border-radius:12px;padding:16px 18px 6px;margin:22px 0;background:var(--surface)}
+  .callout .lab{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+    display:inline-block;padding:3px 9px;border-radius:6px;margin-bottom:8px}
+  .callout p{margin:0 0 12px;font-size:16.5px}
+  .plain{background:var(--ochre-tint);border-color:#EBD9A8}
+  .plain .lab{background:#F3E4BD;color:var(--ochre-dark)}
+  .tip{background:var(--indigo-tint);border-color:#D6D3EE}
+  .tip .lab{background:#DEDBF3;color:var(--indigo-dark)}
+  .warn{background:var(--rose-tint);border-color:#F1CDD1}
+  .warn .lab{background:#F5D6DA;color:var(--rose-dark)}
+
+  .uses{margin:24px 0 6px}
+  .uses .lab{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--teal-dark)}
+  .uses ul{list-style:none;padding:0;margin:10px 0 0}
+  .uses li{position:relative;padding:6px 0 6px 22px;font-size:16.5px;border-bottom:1px solid var(--line)}
+  .uses li:last-child{border-bottom:0}
+  .uses li::before{content:"";position:absolute;left:2px;top:15px;width:7px;height:7px;border-radius:2px;background:var(--teal)}
+
+  .cards3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:24px 0}
+  .shot{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .shot h4{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--indigo-dark);margin:0 0 6px}
+  .shot p{font-size:14.5px;line-height:1.5;color:var(--muted);margin:0}
+  .shot .tag{font-family:var(--mono);font-size:10.5px;color:var(--teal-dark);display:block;margin-top:8px}
+
+  figure{margin:26px 0;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px 20px 10px}
+  figure svg{display:block;width:100%;height:auto}
+  figcaption{font-family:var(--mono);font-size:11.5px;color:var(--faint);text-align:center;margin-top:8px;letter-spacing:.02em}
+  .d-t{font-family:var(--sans);font-weight:500;font-size:14px;fill:var(--ink)}
+  .d-s{font-family:var(--serif);font-size:12.5px;fill:var(--muted)}
+  .d-lab{font-family:var(--mono);font-size:11px;letter-spacing:.06em;fill:var(--faint)}
+
+  footer{border-top:1px solid var(--line);padding:44px 0 72px;margin-top:8px}
+  .res{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px 0 0}
+  .res a{display:block;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;
+    text-decoration:none;color:var(--ink);transition:border-color .15s,transform .15s}
+  .res a:hover{border-color:var(--indigo);transform:translateY(-1px)}
+  .res .k{font-family:var(--mono);font-size:11px;color:var(--indigo);letter-spacing:.05em;display:block;margin-bottom:3px}
+  .res .d{font-size:14px;color:var(--muted);line-height:1.4}
+  .endnote{font-size:15px;color:var(--muted);margin-top:26px}
+
+  a:focus-visible,nav.toc a:focus-visible{outline:2px solid var(--indigo);outline-offset:3px;border-radius:3px}
+
+  @media (max-width:980px){ .layout{grid-template-columns:minmax(0,760px);gap:0} nav.toc{display:none} }
+  @media (max-width:720px){
+    .hero{grid-template-columns:1fr;gap:32px}
+    .cards3{grid-template-columns:1fr}
+    .res{grid-template-columns:1fr}
+    body{font-size:17px}
+    header{padding:44px 0 32px}
+  }
+  @media (prefers-reduced-motion:reduce){ html{scroll-behavior:auto} *{transition:none!important;animation:none!important} }
+</style>
+</head>
+<body>
+<div id="progress" aria-hidden="true"></div>
+
+<header>
+  <div class="wrap">
+    <div class="hero">
+      <div>
+        <span class="eyebrow">A hands-on tutorial · with Claude</span>
+        <h1>Give the model<br><span class="u">your own knowledge.</span></h1>
+        <p class="lede">A language model doesn't know your private or up-to-date documents. So instead of retraining it, you fetch the right passages and hand them over. Embeddings, vector search, and RAG are how that works.</p>
+        <div class="meta">
+          <span class="chip">Beginner-friendly</span>
+          <span class="chip">Python examples</span>
+          <span class="chip">~18 min read</span>
+        </div>
+      </div>
+      <div class="card" aria-label="Example of retrieval by meaning">
+        <div class="bar"><i></i><i></i><i></i></div>
+        <div class="turn"><span class="role r-usr">Query</span><div class="txt">"how long do refunds take?"</div></div>
+        <div class="turn"><span class="role r-match">Match</span><span class="score">0.91</span><div class="txt">Refunds are processed within 5 business days.</div></div>
+        <div class="turn"><span class="role r-match">Match</span><span class="score">0.42</span><div class="txt">Our office is closed on public holidays.</div></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+<div class="layout">
+
+  <nav class="toc" aria-label="Contents">
+    <div class="tl">On this page</div>
+    <a href="#start"><span class="n">00</span>Start here</a>
+    <a href="#embeddings"><span class="n">01</span>Embeddings (review)</a>
+    <a href="#cosine"><span class="n">02</span>Cosine similarity</a>
+    <a href="#search"><span class="n">03</span>Vector search</a>
+    <a href="#chunking"><span class="n">04</span>Chunking strategies</a>
+    <a href="#metadata"><span class="n">05</span>Metadata filtering</a>
+    <a href="#rag"><span class="n">06</span>The RAG pipeline</a>
+    <a href="#contextual"><span class="n">07</span>Level up: contextual retrieval</a>
+    <a href="#resources"><span class="n">→</span>Keep learning</a>
+  </nav>
+
+  <article>
+
+    <!-- 00 -->
+    <section id="start">
+      <span class="step">Start here</span>
+      <h2>The problem: the model doesn't know your stuff</h2>
+      <p>A language model only knows what it saw during training. It has never read your company wiki, last week's tickets, or that 300-page policy PDF. You could retrain it on your documents — but that's slow, expensive, and out of date the moment a document changes.</p>
+      <p>There's a much cheaper move: when a question comes in, <strong>find the few passages that answer it and paste them into the prompt</strong>. The model reads them right there and answers from them. That pattern is called <strong>RAG — Retrieval-Augmented Generation</strong>: retrieve the right text, then let the model generate an answer using it.</p>
+      <p>Everything in this guide serves that one move. Two ideas do the heavy lifting: <strong>embeddings</strong> turn meaning into numbers so a computer can compare it, and <strong>vector search</strong> uses those numbers to find the passages closest in meaning to a question.</p>
+      <div class="callout tip">
+        <span class="lab">What this covers</span>
+        <p><strong>01 Embeddings</strong> — meaning as numbers. <strong>02 Cosine similarity</strong> — scoring closeness. <strong>03 Vector search</strong> — finding the nearest passages. <strong>04 Chunking</strong> — how to slice documents. <strong>05 Metadata filtering</strong> — narrowing the search. <strong>06 RAG</strong> — the full pipeline. <strong>07</strong> — Anthropic's contextual-retrieval upgrade.</p>
+      </div>
+    </section>
+
+    <!-- 01 -->
+    <section id="embeddings">
+      <span class="step">01 <span class="dot">/</span> Meaning as numbers</span>
+      <h2>Embeddings (a quick review)</h2>
+
+      <div class="callout plain">
+        <span class="lab">In plain words</span>
+        <p>Picture a map where <strong>location means meaning</strong>. On this map, "cat" and "kitten" sit right next to each other; "cat" and "bicycle" are far apart. An embedding model reads a piece of text and hands you its coordinates on that map — a list of numbers that says <em>where this meaning lives</em>.</p>
+      </div>
+
+      <h3>What it is</h3>
+      <p>An <strong>embedding</strong> is a fixed-length list of numbers (a <em>vector</em>, often several hundred or a thousand values) that represents the meaning of a piece of text. The key property: <strong>similar meanings produce nearby vectors</strong>, and different meanings produce distant ones.</p>
+
+      <figure aria-labelledby="emb-cap">
+        <svg viewBox="0 0 720 380" role="img" xmlns="http://www.w3.org/2000/svg">
+          <title>Embeddings map text to points in a meaning space</title>
+          <desc>Text goes through an embedding model to become a vector. In the meaning space, animal words cluster together and vehicle words cluster separately.</desc>
+          <defs>
+            <marker id="a-emb" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M2 1L8 5L2 9" fill="none" stroke="#5A6172" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </marker>
+          </defs>
+          <rect x="40" y="40" width="150" height="52" rx="10" fill="#FBF1DC" stroke="#EBD9A8"/>
+          <text class="d-t" x="115" y="66" text-anchor="middle" dominant-baseline="central" fill="#7A4E00">the cat napped</text>
+          <line x1="190" y1="66" x2="246" y2="66" stroke="#5A6172" stroke-width="1.4" marker-end="url(#a-emb)"/>
+          <rect x="254" y="40" width="150" height="52" rx="10" fill="#EBECF0" stroke="#B7BCCC"/>
+          <text class="d-t" x="329" y="66" text-anchor="middle" dominant-baseline="central">embedding model</text>
+          <line x1="404" y1="66" x2="460" y2="66" stroke="#5A6172" stroke-width="1.4" marker-end="url(#a-emb)"/>
+          <rect x="468" y="40" width="210" height="52" rx="10" fill="#E6F2E9" stroke="#AED6BB"/>
+          <text class="d-t" x="573" y="66" text-anchor="middle" dominant-baseline="central" fill="#1E5A31">[0.2, -0.4, 0.9, …]</text>
+
+          <rect x="40" y="120" width="640" height="240" rx="14" fill="#FBFBFD" stroke="#E2E4EC"/>
+          <text class="d-lab" x="62" y="146">MEANING SPACE — CLOSER MEANS MORE SIMILAR</text>
+          <ellipse cx="200" cy="228" rx="62" ry="56" fill="none" stroke="#3D3A98" stroke-width="1" stroke-dasharray="4 4" opacity="0.5"/>
+          <ellipse cx="535" cy="252" rx="72" ry="58" fill="none" stroke="#14746F" stroke-width="1" stroke-dasharray="4 4" opacity="0.5"/>
+          <circle cx="180" cy="215" r="5" fill="#3D3A98"/><text class="d-s" x="192" y="219">cat</text>
+          <circle cx="225" cy="190" r="5" fill="#3D3A98"/><text class="d-s" x="237" y="194">kitten</text>
+          <circle cx="200" cy="262" r="5" fill="#3D3A98"/><text class="d-s" x="212" y="266">dog</text>
+          <circle cx="520" cy="250" r="5" fill="#14746F"/><text class="d-s" x="532" y="254">car</text>
+          <circle cx="560" cy="222" r="5" fill="#14746F"/><text class="d-s" x="572" y="226">truck</text>
+          <circle cx="505" cy="292" r="5" fill="#14746F"/><text class="d-s" x="517" y="296">bicycle</text>
+          <text class="d-lab" x="165" y="318" fill="#3D3A98">ANIMALS</text>
+          <text class="d-lab" x="503" y="332" fill="#14746F">VEHICLES</text>
+        </svg>
+        <figcaption id="emb-cap">Text becomes a point in "meaning space" — related words land near each other</figcaption>
+      </figure>
+
+      <h3>Why it matters</h3>
+      <p>Computers can't compare <em>meaning</em> directly, but they're great at comparing <em>numbers</em>. Embeddings turn the fuzzy question "how similar are these two texts?" into simple arithmetic on two vectors. That single trick is what makes semantic search, recommendations, and RAG possible.</p>
+
+      <h3>How to do it with Claude</h3>
+      <p>Anthropic doesn't ship its own embedding model — instead it recommends <a href="https://docs.claude.com/en/docs/build-with-claude/embeddings">Voyage AI</a> as the embeddings provider. Voyage offers general models (like <code>voyage-3.5</code> and <code>voyage-3-large</code>), a cheaper <code>voyage-3.5-lite</code>, and domain-tuned models for finance, law, and code. One thing worth knowing: set <code>input_type</code> to <code>"document"</code> when embedding your passages and <code>"query"</code> when embedding a question — it improves retrieval quality.</p>
+
+      <pre><code>import voyageai
+vo = voyageai.Client()   <span class="c-cmt"># reads VOYAGE_API_KEY from your env</span>
+
+docs = ["Refunds are processed within 5 business days.",
+        "Our office is closed on public holidays."]
+
+doc_vecs = vo.embed(docs, model="voyage-3.5",
+                    input_type="document").embeddings   <span class="c-cmt"># list of vectors</span></code></pre>
+
+      <div class="uses">
+        <span class="lab">Where you'd use it</span>
+        <ul>
+          <li>Semantic search — find text by meaning, not exact keywords.</li>
+          <li>Recommendations — "more like this" by vector nearness.</li>
+          <li>Clustering &amp; deduplication — group texts that mean the same thing.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 02 -->
+    <section id="cosine">
+      <span class="step">02 <span class="dot">/</span> Scoring closeness</span>
+      <h2>Cosine similarity</h2>
+
+      <div class="callout plain">
+        <span class="lab">In plain words</span>
+        <p>Think of each embedding as an arrow pointing out from the center. <strong>Cosine similarity measures the angle between two arrows</strong> — not how long they are. Pointing the same way → about <strong>1</strong> (very similar). At a right angle → <strong>0</strong> (unrelated). Pointing opposite → <strong>−1</strong>.</p>
+      </div>
+
+      <h3>What it is</h3>
+      <p>Cosine similarity is a single number from <strong>−1 to 1</strong> that says how aligned two vectors are. Because it only cares about <em>direction</em>, it ignores how "big" a vector is — so a short sentence and a long paragraph about the same topic still score as similar.</p>
+
+      <figure aria-labelledby="cos-cap">
+        <svg viewBox="0 0 720 300" role="img" xmlns="http://www.w3.org/2000/svg">
+          <title>Cosine similarity is the angle between two vectors</title>
+          <desc>Two vectors from the origin with a small angle between them score close to one. A number line shows cosine ranging from minus one to one.</desc>
+          <defs>
+            <marker id="a-cos" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </marker>
+          </defs>
+          <line x1="95" y1="250" x2="365" y2="250" stroke="#CFD3DE" stroke-width="1"/>
+          <line x1="110" y1="255" x2="110" y2="85" stroke="#CFD3DE" stroke-width="1"/>
+          <line x1="110" y1="250" x2="300" y2="110" stroke="#3D3A98" stroke-width="2" marker-end="url(#a-cos)"/>
+          <line x1="110" y1="250" x2="330" y2="178" stroke="#14746F" stroke-width="2" marker-end="url(#a-cos)"/>
+          <path d="M148.7 221.5 A 48 48 0 0 1 155.6 235.1" fill="none" stroke="#5A6172" stroke-width="1.2"/>
+          <text class="d-t" x="168" y="224">&#952;</text>
+          <text class="d-s" x="305" y="108" fill="#2A2870">A · "happy"</text>
+          <text class="d-s" x="335" y="182" fill="#0E4F4B">B · "joyful"</text>
+          <text class="d-s" x="110" y="284">Small angle &#8594; same direction &#8594; cos &#8776; 0.95</text>
+
+          <text class="d-lab" x="430" y="120">COSINE SIMILARITY: &#8722;1 TO 1</text>
+          <line x1="445" y1="175" x2="670" y2="175" stroke="#CFD3DE" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="445" cy="175" r="4" fill="#B23A48"/>
+          <circle cx="557" cy="175" r="4" fill="#B7BCCC"/>
+          <circle cx="670" cy="175" r="4" fill="#14746F"/>
+          <text class="d-t" x="445" y="162" text-anchor="middle">&#8722;1</text>
+          <text class="d-t" x="557" y="162" text-anchor="middle">0</text>
+          <text class="d-t" x="670" y="162" text-anchor="middle">1</text>
+          <text class="d-s" x="445" y="197" text-anchor="middle">opposite</text>
+          <text class="d-s" x="557" y="197" text-anchor="middle">unrelated</text>
+          <text class="d-s" x="670" y="197" text-anchor="middle">identical</text>
+        </svg>
+        <figcaption id="cos-cap">Cosine scores direction (meaning), not length — that's why it works across text of any size</figcaption>
+      </figure>
+
+      <h3>The formula, gently</h3>
+      <p>Cosine similarity is the <strong>dot product</strong> of the two vectors divided by the product of their lengths. You rarely compute it by hand — but here it is in code, plus a handy shortcut:</p>
+
+      <pre><code>import numpy as np
+
+def cosine(a, b):
+    a, b = np.array(a), np.array(b)
+    return a @ b / (np.linalg.norm(a) * np.linalg.norm(b))
+
+<span class="c-cmt"># Shortcut: if vectors are already normalized (length 1),</span>
+<span class="c-cmt"># the dot product `a @ b` IS the cosine — no division needed.</span></code></pre>
+
+      <div class="callout tip">
+        <span class="lab">Good to know</span>
+        <p>Vector databases usually let you pick the distance metric — cosine, dot product, or Euclidean. For text embeddings, <strong>cosine is the common default</strong>, and you'll see it everywhere in RAG.</p>
+      </div>
+    </section>
+
+    <!-- 03 -->
+    <section id="search">
+      <span class="step">03 <span class="dot">/</span> Finding the nearest passages</span>
+      <h2>Vector search</h2>
+
+      <div class="callout plain">
+        <span class="lab">In plain words</span>
+        <p>You've turned every passage into a point on the meaning map. To answer a question, you turn the <em>question</em> into a point too, then look for the <strong>nearest points</strong> — those passages are the most relevant. That's the whole idea of vector search: nearest neighbors by meaning.</p>
+      </div>
+
+      <h3>What it is</h3>
+      <p>Given a query vector, <strong>vector search returns the stored vectors closest to it</strong> (highest cosine similarity). For a small collection you can just compare against every vector — that's "brute force" and it's perfectly fine for thousands of items.</p>
+
+      <pre><code>q = vo.embed(["how long do refunds take?"], model="voyage-3.5",
+             input_type="query").embeddings[0]
+
+scores = [cosine(q, v) for v in doc_vecs]   <span class="c-cmt"># score every stored chunk</span>
+best_i = int(np.argmax(scores))
+print(docs[best_i])                          <span class="c-cmt"># -> the refunds sentence</span></code></pre>
+
+      <h3>When it gets big</h3>
+      <p>Comparing against millions of vectors one by one is too slow. That's where <strong>vector databases</strong> come in — tools like Pinecone, Weaviate, Qdrant, Chroma, Milvus, or Postgres with <code>pgvector</code>. They use <strong>approximate nearest neighbor (ANN)</strong> indexes that find the closest vectors almost instantly, trading a sliver of accuracy for a huge speed-up. They also store your metadata and handle filtering (next up).</p>
+
+      <div class="uses">
+        <span class="lab">Where you'd use it</span>
+        <ul>
+          <li>The retrieval step of any RAG system.</li>
+          <li>"Find similar documents / products / images" features.</li>
+          <li>Detecting near-duplicate or anomalous text at scale.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 04 -->
+    <section id="chunking">
+      <span class="step">04 <span class="dot">/</span> Slicing your documents</span>
+      <h2>Chunking strategies</h2>
+
+      <div class="callout plain">
+        <span class="lab">In plain words</span>
+        <p>You can't hand the model a whole 300-page manual for every question. You slice it into bite-size passages — <strong>chunks</strong> — so retrieval can pull just the relevant slices. <em>How</em> you slice matters a lot: it's often the single biggest lever on how good your RAG system feels.</p>
+      </div>
+
+      <h3>Why size matters</h3>
+      <p>Chunks that are <strong>too big</strong> mix several topics, which muddies the embedding and wastes room in the prompt. Chunks that are <strong>too small</strong> chop ideas in half and lose the context needed to be useful. The goal is chunks that each hold roughly one coherent idea.</p>
+
+      <figure aria-labelledby="chk-cap">
+        <svg viewBox="0 0 720 155" role="img" xmlns="http://www.w3.org/2000/svg">
+          <title>Chunking a document with overlap</title>
+          <desc>A long document is split into three chunks. Adjacent chunks overlap slightly so ideas that cross a boundary are not lost.</desc>
+          <text class="d-lab" x="40" y="18">ONE LONG DOCUMENT</text>
+          <rect x="40" y="26" width="640" height="18" rx="6" fill="#EBECF0" stroke="#CFD3DE"/>
+          <rect x="230" y="60" width="40" height="66" fill="#3D3A98" opacity="0.12"/>
+          <rect x="420" y="60" width="40" height="66" fill="#A66A00" opacity="0.12"/>
+          <rect x="40" y="64" width="230" height="26" rx="6" fill="#ECEBF6" stroke="#C6C2E6"/>
+          <text class="d-s" x="155" y="80" text-anchor="middle" dominant-baseline="central" fill="#2A2870">chunk 1</text>
+          <rect x="230" y="98" width="230" height="26" rx="6" fill="#E1F0EC" stroke="#A9D5CB"/>
+          <text class="d-s" x="345" y="114" text-anchor="middle" dominant-baseline="central" fill="#0E4F4B">chunk 2</text>
+          <rect x="420" y="64" width="230" height="26" rx="6" fill="#FBF1DC" stroke="#EBD9A8"/>
+          <text class="d-s" x="535" y="80" text-anchor="middle" dominant-baseline="central" fill="#7A4E00">chunk 3</text>
+          <text class="d-lab" x="250" y="144" text-anchor="middle">overlap</text>
+        </svg>
+        <figcaption id="chk-cap">A little overlap between chunks keeps ideas that span a boundary from being lost</figcaption>
+      </figure>
+
+      <h3>The main strategies</h3>
+      <div class="cards3">
+        <div class="shot"><h4>Fixed size</h4><p>Cut every N tokens or characters. Dead simple, but can slice mid-sentence.</p><span class="tag">easiest · lowest quality</span></div>
+        <div class="shot"><h4>With overlap</h4><p>Repeat a little text between chunks (say 10–20%) so boundary-spanning ideas survive.</p><span class="tag">a cheap, reliable win</span></div>
+        <div class="shot"><h4>By sentence / paragraph</h4><p>Split on natural breaks so each chunk is a whole thought, not a fragment.</p><span class="tag">keeps ideas intact</span></div>
+        <div class="shot"><h4>Structure-aware</h4><p>Split on headings, sections, or (for code) functions. Great when docs have real structure.</p><span class="tag">best for structured docs</span></div>
+        <div class="shot"><h4>Semantic</h4><p>Group sentences by similarity so each chunk covers one topic. Smarter, a bit more work.</p><span class="tag">topic-tight chunks</span></div>
+        <div class="shot"><h4>Rule of thumb</h4><p>Start ~a few hundred tokens with small overlap, respect natural boundaries, then measure.</p><span class="tag">where to begin</span></div>
+      </div>
+
+      <div class="callout tip">
+        <span class="lab">Tip</span>
+        <p>There's no universal best chunk size. Anthropic's own advice for RAG is plain: <strong>experiment with chunk size, boundary, and overlap, then evaluate on your own data</strong>. Chunking is where you should spend real tuning effort.</p>
+      </div>
+    </section>
+
+    <!-- 05 -->
+    <section id="metadata">
+      <span class="step">05 <span class="dot">/</span> Narrowing the search</span>
+      <h2>Metadata filtering</h2>
+
+      <div class="callout plain">
+        <span class="lab">In plain words</span>
+        <p>Cosine similarity finds passages that <em>sound</em> relevant. <strong>Metadata is the label on each passage</strong> — its source, date, author, product, language, or who's allowed to see it. Filtering by metadata is like telling the librarian "search only the 2024 finance folder" before you go looking for the closest book.</p>
+      </div>
+
+      <h3>What it is</h3>
+      <p>When you store each chunk's vector, you also store a few plain fields alongside it — its <strong>metadata</strong>. At query time you use those fields to <strong>restrict</strong> the search to the chunks that qualify, then rank the survivors by meaning.</p>
+
+      <h3>Why it matters</h3>
+      <p>Three reasons. <strong>Relevance:</strong> a perfect meaning-match from the wrong year is still the wrong answer. <strong>Correctness:</strong> keep results inside the right scope (this product, this region). <strong>Security:</strong> filtering by <code>user_id</code> or access level stops one customer's documents from surfacing in another's results.</p>
+
+      <pre><code><span class="c-cmt"># store each chunk WITH metadata</span>
+collection.add(
+    documents=chunks,
+    embeddings=chunk_vecs,
+    metadatas=[{"source": "policy", "year": 2024, "team": "finance"}, ...],
+)
+
+<span class="c-cmt"># restrict to 2024 finance policy, THEN rank the matches by meaning</span>
+results = collection.query(
+    query_embeddings=[q],
+    n_results=3,
+    where={"year": 2024, "source": "policy", "team": "finance"},
+)</code></pre>
+
+      <div class="callout tip">
+        <span class="lab">Related: hybrid search</span>
+        <p>Meaning search can miss exact strings. Ask for <em>"Error code TS-999"</em> and an embedding may return general error-handling text but skip the precise match. <strong>Hybrid search</strong> pairs semantic search with old-fashioned keyword search (BM25) so exact terms — codes, names, IDs — still land. You'll see this again in the next section.</p>
+      </div>
+
+      <div class="uses">
+        <span class="lab">Where you'd use it</span>
+        <ul>
+          <li>Multi-tenant apps that must keep each customer's data separate.</li>
+          <li>Time-sensitive answers where only the latest version counts.</li>
+          <li>Large knowledge bases split by product, region, or department.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 06 -->
+    <section id="rag">
+      <span class="step">06 <span class="dot">/</span> Putting it together</span>
+      <h2>The RAG pipeline</h2>
+      <p>Now the pieces click together. A RAG system runs in <strong>two phases</strong>: an <strong>index</strong> phase you run once (and refresh when docs change), and a <strong>query</strong> phase that runs on every question.</p>
+
+      <figure aria-labelledby="rag-cap">
+        <svg viewBox="0 0 720 300" role="img" xmlns="http://www.w3.org/2000/svg">
+          <title>The RAG pipeline: index time and query time</title>
+          <desc>At index time, documents are chunked, embedded, and stored in a vector database. At query time, the question is embedded, matching chunks are retrieved and filtered, then Claude answers using them.</desc>
+          <defs>
+            <marker id="a-rag" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </marker>
+          </defs>
+          <text class="d-lab" x="40" y="48">INDEX TIME · DONE ONCE</text>
+          <rect x="40" y="68" width="120" height="54" rx="10" fill="#FBF1DC" stroke="#EBD9A8"/>
+          <text class="d-t" x="100" y="90" text-anchor="middle" dominant-baseline="central" fill="#7A4E00">Your docs</text>
+          <text class="d-s" x="100" y="108" text-anchor="middle" dominant-baseline="central" fill="#8A6B2E">wiki, PDFs</text>
+          <line x1="160" y1="95" x2="188" y2="95" stroke="#5A6172" stroke-width="1.4" marker-end="url(#a-rag)"/>
+          <rect x="196" y="68" width="120" height="54" rx="10" fill="#ECEBF6" stroke="#C6C2E6"/>
+          <text class="d-t" x="256" y="90" text-anchor="middle" dominant-baseline="central" fill="#2A2870">Chunk</text>
+          <text class="d-s" x="256" y="108" text-anchor="middle" dominant-baseline="central" fill="#5A5484">into passages</text>
+          <line x1="316" y1="95" x2="344" y2="95" stroke="#5A6172" stroke-width="1.4" marker-end="url(#a-rag)"/>
+          <rect x="352" y="68" width="120" height="54" rx="10" fill="#E1F0EC" stroke="#A9D5CB"/>
+          <text class="d-t" x="412" y="90" text-anchor="middle" dominant-baseline="central" fill="#0E4F4B">Embed</text>
+          <text class="d-s" x="412" y="108" text-anchor="middle" dominant-baseline="central" fill="#3B6E68">text &#8594; vectors</text>
+          <line x1="472" y1="95" x2="500" y2="95" stroke="#5A6172" stroke-width="1.4" marker-end="url(#a-rag)"/>
+          <rect x="508" y="68" width="120" height="54" rx="10" fill="#EBECF0" stroke="#B7BCCC"/>
+          <text class="d-t" x="568" y="90" text-anchor="middle" dominant-baseline="central">Vector DB</text>
+          <text class="d-s" x="568" y="108" text-anchor="middle" dominant-baseline="central">vectors + tags</text>
+
+          <text class="d-lab" x="40" y="190">QUERY TIME · EVERY QUESTION</text>
+          <rect x="40" y="210" width="120" height="54" rx="10" fill="#FBF1DC" stroke="#EBD9A8"/>
+          <text class="d-t" x="100" y="232" text-anchor="middle" dominant-baseline="central" fill="#7A4E00">Question</text>
+          <text class="d-s" x="100" y="250" text-anchor="middle" dominant-baseline="central" fill="#8A6B2E">user asks</text>
+          <line x1="160" y1="237" x2="188" y2="237" stroke="#5A6172" stroke-width="1.4" marker-end="url(#a-rag)"/>
+          <rect x="196" y="210" width="120" height="54" rx="10" fill="#E1F0EC" stroke="#A9D5CB"/>
+          <text class="d-t" x="256" y="232" text-anchor="middle" dominant-baseline="central" fill="#0E4F4B">Embed</text>
+          <text class="d-s" x="256" y="250" text-anchor="middle" dominant-baseline="central" fill="#3B6E68">&#8594; a vector</text>
+          <line x1="316" y1="237" x2="344" y2="237" stroke="#5A6172" stroke-width="1.4" marker-end="url(#a-rag)"/>
+          <rect x="352" y="210" width="120" height="54" rx="10" fill="#ECEBF6" stroke="#C6C2E6"/>
+          <text class="d-t" x="412" y="232" text-anchor="middle" dominant-baseline="central" fill="#2A2870">Search</text>
+          <text class="d-s" x="412" y="250" text-anchor="middle" dominant-baseline="central" fill="#5A5484">cosine + filter</text>
+          <line x1="472" y1="237" x2="500" y2="237" stroke="#5A6172" stroke-width="1.4" marker-end="url(#a-rag)"/>
+          <rect x="508" y="210" width="120" height="54" rx="10" fill="#E6F2E9" stroke="#AED6BB"/>
+          <text class="d-t" x="568" y="232" text-anchor="middle" dominant-baseline="central" fill="#1E5A31">Claude</text>
+          <text class="d-s" x="568" y="250" text-anchor="middle" dominant-baseline="central" fill="#3E7A52">answers</text>
+
+          <path d="M568 122 L568 166 L412 166 L412 210" fill="none" stroke="#A66A00" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#a-rag)"/>
+          <text class="d-s" x="490" y="160" text-anchor="middle" fill="#7A4E00">top matches</text>
+          <text class="d-s" x="568" y="286" text-anchor="middle">&#8594; grounded, cited answer</text>
+        </svg>
+        <figcaption id="rag-cap">Index once; on each question, retrieve the best chunks and let Claude answer from them</figcaption>
+      </figure>
+
+      <p>Here's the whole thing as one small program — embed a corpus, find the closest chunks by cosine, stuff them into the prompt, and let Claude answer. Notice the <strong>guardrail</strong> in the system prompt (answer only from the context, or say you don't know) — the same idea from the prompt-engineering chapter.</p>
+
+      <pre><code>import voyageai, numpy as np
+from anthropic import Anthropic
+
+vo, claude = voyageai.Client(), Anthropic()
+
+<span class="c-cmt"># --- index time (run once) ---</span>
+chunks = [ ... ]                                   <span class="c-cmt"># your document passages</span>
+vecs = vo.embed(chunks, model="voyage-3.5",
+                input_type="document").embeddings
+
+def cosine(a, b):
+    a, b = np.array(a), np.array(b)
+    return a @ b / (np.linalg.norm(a) * np.linalg.norm(b))
+
+<span class="c-cmt"># --- query time (per question) ---</span>
+question = "What's our refund window?"
+qv = vo.embed([question], model="voyage-3.5",
+              input_type="query").embeddings[0]
+
+top = sorted(range(len(chunks)),
+             key=lambda i: cosine(qv, vecs[i]), reverse=True)[:3]
+context = "\n\n".join(chunks[i] for i in top)      <span class="c-cmt"># the retrieved passages</span>
+
+msg = claude.messages.create(
+    model="claude-sonnet-4-5",
+    max_tokens=512,
+    system=("Answer using ONLY the context below. "
+            "If the answer isn't there, say you don't know."),   <span class="c-cmt"># guardrail</span>
+    messages=[{"role": "user",
+        "content": f"&lt;context&gt;\n{context}\n&lt;/context&gt;\n\nQ: {question}"}],
+)
+print(msg.content[0].text)</code></pre>
+      <p class="codecap">Retrieve by meaning, then generate from the retrieved text — that's RAG in one screen.</p>
+    </section>
+
+    <!-- 07 -->
+    <section id="contextual">
+      <span class="step">07 <span class="dot">/</span> Level up</span>
+      <h2>Contextual retrieval (Anthropic's upgrade)</h2>
+
+      <div class="callout plain">
+        <span class="lab">In plain words</span>
+        <p>Here's a sneaky failure. A chunk says <em>"Revenue grew 3% over the previous quarter"</em> — but the company name and the quarter were mentioned two paragraphs earlier, in a different chunk. On its own, this chunk barely matches the question <em>"What was ACME's Q2 2024 growth?"</em>, so it gets buried. Naive chunking throws away context, and that's the number-one reason RAG returns "I couldn't find it."</p>
+      </div>
+
+      <h3>The fix</h3>
+      <p>Anthropic's <a href="https://www.anthropic.com/engineering/contextual-retrieval">Contextual Retrieval</a> is simple: <strong>before embedding each chunk, prepend a short context line</strong> (generated by Claude) that situates the chunk in its document — the company, the section, the time period. You embed and index <em>that</em> enriched chunk. Pair it with keyword (BM25) search for a hybrid system that catches exact terms too.</p>
+
+      <pre><code><span class="c-cmt"># ask Claude to situate each chunk in its document, then embed THIS</span>
+prompt = f"""Here is a document:
+&lt;document&gt;{whole_document}&lt;/document&gt;
+Here is one chunk from it:
+&lt;chunk&gt;{chunk}&lt;/chunk&gt;
+In 1-2 sentences, say what this chunk is about and where it fits,
+so it's easier to find by search. Reply with that context only."""
+
+context_line = claude.messages.create(...).content[0].text
+chunk_to_embed = context_line + "\n\n" + chunk        <span class="c-cmt"># embed + index this</span></code></pre>
+
+      <h3>Does it help? (measured)</h3>
+      <p>Anthropic's own tests report real gains in retrieval accuracy (they measure the rate of failed retrievals):</p>
+      <div class="uses">
+        <span class="lab">Reported improvements</span>
+        <ul>
+          <li>Contextual embeddings alone — about <strong>35% fewer</strong> failed retrievals (5.7% → 3.7%).</li>
+          <li>Adding contextual keyword (BM25) search — about <strong>49% fewer</strong>.</li>
+          <li>Adding a reranking step on top — about <strong>67% fewer</strong>.</li>
+        </ul>
+      </div>
+      <div class="callout tip">
+        <span class="lab">Two more terms you'll meet</span>
+        <p><strong>Reranking:</strong> retrieve a wide net (say the top 150 chunks), then a reranker model re-scores them and you keep the best few (say 20). <strong>Prompt caching:</strong> generating a context line per chunk costs tokens — caching the shared document keeps that cheap. And always test on <em>your</em> data; published numbers don't automatically transfer.</p>
+      </div>
+    </section>
+
+    <footer id="resources">
+      <span class="step">Keep learning</span>
+      <h2 style="margin-top:12px">Official sources &amp; deeper dives</h2>
+      <p>Everything above is grounded in Anthropic's documentation and engineering write-ups. Best next stops:</p>
+      <div class="res">
+        <a href="https://docs.claude.com/en/docs/build-with-claude/embeddings">
+          <span class="k">Docs · Embeddings</span><span class="d">What embeddings are and how to generate them with Voyage AI.</span></a>
+        <a href="https://www.anthropic.com/engineering/contextual-retrieval">
+          <span class="k">Engineering · Contextual Retrieval</span><span class="d">The context-loss problem, the fix, and the full benchmark results.</span></a>
+        <a href="https://github.com/anthropics/claude-cookbooks/blob/main/third_party/VoyageAI/how_to_create_embeddings.md">
+          <span class="k">Cookbook · Voyage embeddings</span><span class="d">A runnable notebook: embed a small corpus and search it.</span></a>
+        <a href="https://www.anthropic.com/learn/build-with-claude">
+          <span class="k">Academy · Build with Claude</span><span class="d">Guided path covering RAG, embeddings, and evaluations.</span></a>
+        <a href="https://docs.voyageai.com/">
+          <span class="k">Voyage AI · Docs</span><span class="d">Model list, the input_type argument, rerankers, and the HTTP API.</span></a>
+        <a href="https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/overview">
+          <span class="k">Previous chapter · Prompt engineering</span><span class="d">System prompts, few-shot, structured outputs, guardrails.</span></a>
+      </div>
+      <p class="endnote">Best way to learn: build the tiny RAG program above with five or six of your own sentences. Watch which chunk wins for different questions — that hands-on loop teaches embeddings and cosine faster than any reading.</p>
+    </footer>
+
+  </article>
+</div>
+</div>
+
+<script>
+  var bar = document.getElementById('progress');
+  function onScroll(){
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var pct = max > 0 ? (h.scrollTop || document.body.scrollTop) / max * 100 : 0;
+    bar.style.width = pct + '%';
+  }
+  document.addEventListener('scroll', onScroll, {passive:true});
+  onScroll();
+
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+  var map = {};
+  links.forEach(function(a){ map[a.getAttribute('href').slice(1)] = a; });
+  if ('IntersectionObserver' in window){
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if (e.isIntersecting){
+          links.forEach(function(a){ a.classList.remove('active'); });
+          var active = map[e.target.id];
+          if (active) active.classList.add('active');
+        }
+      });
+    }, {rootMargin:'-20% 0px -70% 0px', threshold:0});
+    document.querySelectorAll('article section, article footer').forEach(function(s){
+      if (s.id) obs.observe(s);
+    });
+  }
+</script>
+</body>
+</html>
