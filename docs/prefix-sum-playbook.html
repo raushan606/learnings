@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prefix Sum — The Identification Playbook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EDEFF2;
+    --card:#FFFFFF;
+    --ink:#131A2B;
+    --sub:#5C6678;
+    --faint:#8B94A3;
+    --line:#DCE0E7;
+    --line-strong:#C4CAD4;
+    /* semantic colours: these carry MEANING, not decoration */
+    --add:#0E9D8C;      /* accumulate / build up */
+    --add-bg:#E1F4F1;
+    --ans:#3B5BDB;      /* the answer / the range you want */
+    --ans-bg:#E7ECFD;
+    --cut:#D6456A;      /* subtracted / cancelled out */
+    --cut-bg:#FBE6EC;
+    --zero:#7A52D6;     /* the sentinel 0 (empty prefix) */
+    --zero-bg:#EEE8FB;
+    --shadow:0 1px 2px rgba(19,26,43,.06),0 8px 24px rgba(19,26,43,.06);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:"IBM Plex Sans",system-ui,sans-serif;
+    line-height:1.62;font-size:16.5px;-webkit-font-smoothing:antialiased;
+    padding-bottom:60px;
+  }
+  .wrap{max-width:820px;margin:0 auto;padding:0 18px}
+  code,.mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+
+  /* ---------- HERO ---------- */
+  header.hero{padding:52px 0 30px}
+  .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.22em;
+    text-transform:uppercase;color:var(--ans);font-weight:600;margin:0 0 14px}
+  h1{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:clamp(34px,8.5vw,60px);
+    line-height:1.02;letter-spacing:-.02em;margin:0 0 18px}
+  h1 .u{color:var(--ans)}
+  .lede{font-size:clamp(17px,4.2vw,20px);color:var(--sub);max-width:60ch;margin:0}
+  .lede b{color:var(--ink);font-weight:600}
+
+  .thesis{margin-top:26px;padding:18px 20px;background:var(--ink);color:#F2F4F8;
+    border-radius:14px;font-family:"IBM Plex Mono",monospace;font-size:14.5px;line-height:1.7;
+    box-shadow:var(--shadow);overflow-x:auto}
+  .thesis .c{color:#7DE0D3}
+  .thesis .a{color:#9FB4FF}
+
+  /* ---------- SECTIONS ---------- */
+  section{margin:44px 0}
+  .sec-head{display:flex;align-items:baseline;gap:14px;margin:0 0 6px}
+  .sec-num{font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--faint);
+    font-weight:600;flex:none;padding-top:6px}
+  h2{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:clamp(23px,5.6vw,31px);
+    letter-spacing:-.015em;margin:0;line-height:1.12}
+  .sec-sub{color:var(--sub);margin:8px 0 20px;font-size:16px}
+  h3{font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:19px;
+    margin:30px 0 10px;letter-spacing:-.01em}
+  p{margin:0 0 15px}
+  a{color:var(--ans);text-decoration:none;border-bottom:1px solid rgba(59,91,219,.3)}
+  a:hover{border-bottom-color:var(--ans)}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:22px 22px;margin:18px 0;box-shadow:var(--shadow)}
+
+  ul,ol{margin:0 0 15px;padding-left:22px}
+  li{margin:7px 0}
+  strong{font-weight:600}
+  em{font-style:normal;background:var(--ans-bg);padding:1px 5px;border-radius:5px;
+    color:#25378f;font-weight:500}
+
+  /* pills / badges */
+  .pill{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:11px;
+    font-weight:600;letter-spacing:.03em;padding:2px 8px;border-radius:20px;
+    vertical-align:middle}
+  .p-add{background:var(--add-bg);color:#0b6b5f}
+  .p-ans{background:var(--ans-bg);color:#2b3fa0}
+  .p-cut{background:var(--cut-bg);color:#a12b4c}
+  .p-zero{background:var(--zero-bg);color:#5a37a8}
+
+  /* code blocks */
+  pre{background:#0F1626;color:#E5E9F0;border-radius:12px;padding:16px 16px;
+    overflow-x:auto;font-family:"IBM Plex Mono",monospace;font-size:13.5px;line-height:1.62;
+    margin:14px 0;-webkit-overflow-scrolling:touch}
+  pre .cm{color:#6E7A93;font-style:italic}
+  pre .kw{color:#C99BFF}
+  pre .ty{color:#7DE0D3}
+  pre .st{color:#FFC38B}
+  pre .fn{color:#9FB4FF}
+  pre .nm{color:#F2B5C4}
+  code.inl{background:#EAECF1;color:#243049;padding:1.5px 6px;border-radius:6px;
+    font-size:.9em;border:1px solid var(--line)}
+
+  .formula{background:var(--ans-bg);border:1px solid #C6D2FA;border-radius:12px;
+    padding:16px 18px;margin:16px 0;font-family:"IBM Plex Mono",monospace;
+    font-size:15px;text-align:center;color:#243049;overflow-x:auto}
+  .formula b{color:var(--ans)}
+  .formula .cut{color:var(--cut)}
+
+  /* callouts */
+  .note{border-left:3px solid var(--ans);background:#F4F6FE;border-radius:0 12px 12px 0;
+    padding:14px 18px;margin:16px 0;font-size:15px}
+  .warn{border-left:3px solid var(--cut);background:#FDF2F5;border-radius:0 12px 12px 0;
+    padding:14px 18px;margin:16px 0;font-size:15px}
+  .warn b,.note b{font-weight:600}
+  .note .lbl,.warn .lbl{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;
+    letter-spacing:.12em;text-transform:uppercase;display:block;margin-bottom:4px}
+  .note .lbl{color:var(--ans)} .warn .lbl{color:var(--cut)}
+
+  /* ---------- array cells ---------- */
+  .cells{display:flex;gap:5px;flex-wrap:wrap;margin:6px 0;align-items:flex-end}
+  .cell{min-width:38px;height:44px;border:1px solid var(--line-strong);border-radius:9px;
+    display:flex;align-items:center;justify-content:center;font-family:"IBM Plex Mono",monospace;
+    font-weight:600;font-size:15px;background:#fff;position:relative;flex:0 0 auto;padding:0 4px}
+  .cell.pfx{background:#F6F7F9}
+  .cell.add{background:var(--add-bg);border-color:var(--add);color:#0b6b5f}
+  .cell.ans{background:var(--ans-bg);border-color:var(--ans);color:#2b3fa0}
+  .cell.cut{background:var(--cut-bg);border-color:var(--cut);color:#a12b4c}
+  .cell.zero{background:var(--zero-bg);border-color:var(--zero);color:#5a37a8}
+  .cell .ix{position:absolute;top:-17px;left:50%;transform:translateX(-50%);
+    font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--faint);font-weight:500}
+  .lblrow{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--sub);
+    margin:14px 0 2px;font-weight:600}
+
+  .fig{margin:20px 0;padding:18px 16px;background:#fafbfc;border:1px solid var(--line);
+    border-radius:14px;overflow-x:auto}
+  .fig .cap{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--faint);
+    margin-top:12px;text-align:center}
+  svg{max-width:100%;height:auto;display:block;margin:0 auto}
+
+  /* ---------- interactive demo ---------- */
+  .demo{background:linear-gradient(180deg,#fff,#f7f8fb);border:1px solid var(--line-strong);
+    border-radius:18px;padding:22px 18px;box-shadow:var(--shadow)}
+  .demo h3{margin-top:0}
+  .demo .hint{font-size:13.5px;color:var(--sub);margin:0 0 14px}
+  .dcells{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:14px 0 4px}
+  .dcell{width:46px;height:52px;border:1.5px solid var(--line-strong);border-radius:11px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-family:"IBM Plex Mono",monospace;cursor:pointer;background:#fff;user-select:none;
+    transition:transform .12s ease,background .12s ease,border-color .12s ease;flex:0 0 auto}
+  .dcell:hover{transform:translateY(-2px);border-color:var(--ans)}
+  .dcell:focus-visible{outline:2px solid var(--ans);outline-offset:2px}
+  .dcell .dv{font-weight:600;font-size:16px}
+  .dcell .di{font-size:10px;color:var(--faint);margin-top:2px}
+  .dcell.sel{background:var(--ans-bg);border-color:var(--ans);color:#2b3fa0}
+  .dcell.sel .di{color:var(--ans)}
+  .dtrack{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:16px 0 4px}
+  .ptile{width:46px;height:40px;border:1px dashed var(--line-strong);border-radius:9px;
+    display:flex;align-items:center;justify-content:center;font-family:"IBM Plex Mono",monospace;
+    font-size:13px;color:var(--sub);background:#fafbfc;flex:0 0 auto}
+  .ptile.hiL{border-style:solid;background:var(--cut-bg);border-color:var(--cut);color:#a12b4c}
+  .ptile.hiR{border-style:solid;background:var(--ans-bg);border-color:var(--ans);color:#2b3fa0}
+  .dout{margin-top:16px;padding:14px;background:var(--ink);color:#eef1f6;border-radius:12px;
+    font-family:"IBM Plex Mono",monospace;font-size:14px;text-align:center;line-height:1.7}
+  .dout .a{color:#9FB4FF} .dout .c{color:#F2B5C4} .dout .g{color:#7DE0D3;font-size:18px;font-weight:600}
+  .dbtn{margin-top:12px;text-align:center}
+  .dbtn button{font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:600;
+    background:#fff;border:1px solid var(--line-strong);color:var(--ink);padding:8px 16px;
+    border-radius:9px;cursor:pointer}
+  .dbtn button:hover{border-color:var(--ans);color:var(--ans)}
+
+  /* ---------- dry-run table ---------- */
+  .tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:14px 0;
+    border:1px solid var(--line);border-radius:12px}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:520px}
+  th,td{padding:9px 11px;text-align:center;border-bottom:1px solid var(--line);
+    font-family:"IBM Plex Mono",monospace}
+  th{background:#f4f6f9;font-weight:600;color:var(--sub);font-size:12px;
+    letter-spacing:.02em;position:sticky;top:0}
+  tr:last-child td{border-bottom:none}
+  td.hit{background:var(--add-bg);color:#0b6b5f;font-weight:600}
+  td.lead{text-align:left;color:var(--ink);font-weight:600}
+  .tcap{font-size:12px;color:var(--faint);font-family:"IBM Plex Mono",monospace;margin:6px 2px 0}
+
+  /* ---------- flow / signal grid ---------- */
+  .signals{display:grid;gap:12px;margin:16px 0}
+  .signal{background:#fff;border:1px solid var(--line);border-radius:13px;padding:15px 16px;
+    display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start;box-shadow:var(--shadow)}
+  .signal .k{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;
+    justify-content:center;font-family:"IBM Plex Mono",monospace;font-weight:700;font-size:15px;flex:none}
+  .signal .txt strong{display:block;margin-bottom:2px;font-family:"Space Grotesk";font-size:15.5px}
+  .signal .txt span{font-size:14px;color:var(--sub)}
+  .signal .txt .arrow{color:var(--ans);font-weight:600}
+  .k1{background:var(--ans-bg);color:#2b3fa0}
+  .k2{background:var(--add-bg);color:#0b6b5f}
+  .k3{background:var(--cut-bg);color:#a12b4c}
+  .k4{background:var(--zero-bg);color:#5a37a8}
+  .k5{background:#FFF1DD;color:#a5701a}
+
+  /* ---------- steps ---------- */
+  .step{display:grid;grid-template-columns:auto 1fr;gap:16px;margin:20px 0;align-items:start}
+  .step .n{font-family:"Space Grotesk";font-weight:700;font-size:22px;color:#fff;
+    background:var(--ans);width:38px;height:38px;border-radius:11px;display:flex;
+    align-items:center;justify-content:center;flex:none}
+  .step:nth-child(2) .n{background:#4d6adb}
+  .step:nth-child(3) .n{background:#5f76dd}
+  .step .b h3{margin-top:2px}
+  .step .b p{margin-bottom:8px}
+
+  /* ---------- problem list ---------- */
+  .tier{margin:26px 0}
+  .tier-h{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+  .tier-h h3{margin:0}
+  .tier-tag{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;
+    padding:3px 9px;border-radius:20px}
+  .tier-desc{color:var(--sub);font-size:14.5px;margin:4px 0 12px}
+  .prob{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:baseline;
+    padding:12px 4px;border-bottom:1px solid var(--line)}
+  .prob:last-child{border-bottom:none}
+  .prob .nm-t{font-weight:600;font-size:15px}
+  .prob .num{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--faint)}
+  .prob .diff{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;
+    padding:1px 7px;border-radius:5px}
+  .d-e{background:#E4F4EC;color:#1a7a4a} .d-m{background:#FFF1DD;color:#a5701a}
+  .d-h{background:#FCE7EC;color:#b23a56}
+  .prob .drill{grid-column:1/-1;font-size:13.5px;color:var(--sub);margin-top:-2px}
+  .prob .drill b{color:var(--ink);font-weight:600}
+
+  .cheat{width:100%;font-size:13.5px}
+  .cheat td,.cheat th{text-align:left;padding:11px 12px}
+  .cheat th{font-size:12px}
+  .cheat td:first-child{font-weight:600;color:var(--ink)}
+  .cheat .go{color:var(--add);font-weight:600}
+  .cheat .no{color:var(--cut);font-weight:600}
+
+  hr.div{border:none;border-top:1px solid var(--line);margin:40px 0}
+
+  footer{margin-top:50px;padding-top:24px;border-top:1px solid var(--line);
+    color:var(--faint);font-size:13px;font-family:"IBM Plex Mono",monospace;text-align:center}
+
+  .reveal{opacity:0;transform:translateY(14px);transition:opacity .5s ease,transform .5s ease}
+  .reveal.in{opacity:1;transform:none}
+  @media (prefers-reduced-motion:reduce){
+    .reveal{opacity:1;transform:none;transition:none}
+    html{scroll-behavior:auto}
+    .dcell{transition:none}
+  }
+  @media (max-width:520px){
+    body{font-size:16px}
+    .signal{grid-template-columns:1fr}
+    .signal .k{margin-bottom:-6px}
+    .step{gap:12px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <p class="eyebrow">Array Patterns · Identify → Optimise</p>
+    <h1>Prefix&nbsp;Sum:<br>the <span class="u">identification</span> playbook</h1>
+    <p class="lede">The hard part is never the code — it's <b>spotting</b> that a problem is secretly a prefix-sum problem. This walks the full path: recognise the signal, write the brute force, dry-run it, find the wasted work, and swap in the trick.</p>
+    <div class="thesis">
+<span class="cm">// the whole technique in one line</span>
+Pay for the addition <span class="c">once</span> up front,
+then answer <span class="a">any</span> range query in <span class="a">O(1)</span> forever.
+    </div>
+  </header>
+
+  <!-- ============ 1. THE ONE IDEA ============ -->
+  <section class="reveal">
+    <div class="sec-head"><span class="sec-num">01</span><h2>The one idea</h2></div>
+    <p class="sec-sub">Everything else is a variation on this.</p>
+
+    <p>Imagine a bank statement. To answer <em>"how much did I spend between Tuesday and Friday?"</em> you don't re-add every transaction each time you're asked — you keep a <strong>running balance</strong>. The balance on Friday minus the balance on Monday <em>is</em> the answer. That running balance is a prefix sum.</p>
+
+    <p>A <strong>prefix sum array</strong> stores the cumulative total up to each position. Build it once in one pass, and any range total becomes a single subtraction.</p>
+
+    <div class="fig">
+      <div class="lblrow">nums &nbsp;<span style="color:var(--faint)">(the input)</span></div>
+      <div class="cells">
+        <div class="cell"><span class="ix">0</span>3</div>
+        <div class="cell"><span class="ix">1</span>1</div>
+        <div class="cell"><span class="ix">2</span>4</div>
+        <div class="cell"><span class="ix">3</span>1</div>
+        <div class="cell"><span class="ix">4</span>5</div>
+        <div class="cell"><span class="ix">5</span>9</div>
+      </div>
+      <div class="lblrow" style="margin-top:22px">prefix &nbsp;<span style="color:var(--faint)">(length n+1, starts with a 0)</span></div>
+      <div class="cells">
+        <div class="cell zero"><span class="ix">0</span>0</div>
+        <div class="cell add"><span class="ix">1</span>3</div>
+        <div class="cell add"><span class="ix">2</span>4</div>
+        <div class="cell add"><span class="ix">3</span>8</div>
+        <div class="cell add"><span class="ix">4</span>9</div>
+        <div class="cell add"><span class="ix">5</span>14</div>
+        <div class="cell add"><span class="ix">6</span>23</div>
+      </div>
+      <div class="cap">prefix[k] = sum of the first k elements &nbsp;·&nbsp; prefix[0]=0 is the "empty" sum</div>
+    </div>
+
+    <p>Now for the payoff. Want the sum of <code class="inl">nums[2..4]</code> (that's 4+1+5 = 10)? Don't loop. Take the running total <em>up to the end</em> and subtract the running total <em>before the start</em>:</p>
+
+    <div class="formula">
+      sum(i .. j) &nbsp;=&nbsp; <b>prefix[j+1]</b> &minus; <span class="cut">prefix[i]</span>
+    </div>
+
+    <div class="fig">
+      <div class="lblrow">sum(2 .. 4) = prefix[5] &minus; prefix[2] = 14 &minus; 4 = <span style="color:var(--ans)">10</span></div>
+      <div class="cells">
+        <div class="cell zero"><span class="ix">0</span>0</div>
+        <div class="cell cut"><span class="ix">1</span>3</div>
+        <div class="cell cut"><span class="ix">2</span>4</div>
+        <div class="cell"><span class="ix">3</span>8</div>
+        <div class="cell"><span class="ix">4</span>9</div>
+        <div class="cell ans"><span class="ix">5</span>14</div>
+        <div class="cell"><span class="ix">6</span>23</div>
+      </div>
+      <div class="cap"><span style="color:var(--ans)">keep the total up to index j+1</span> &nbsp; &minus; &nbsp; <span style="color:var(--cut)">cancel everything before index i</span></div>
+    </div>
+
+    <div class="note">
+      <span class="lbl">Why the leading 0?</span>
+      Making <code class="inl">prefix</code> one longer than <code class="inl">nums</code>, with <code class="inl">prefix[0]=0</code>, means the "before the start" term is always valid — even for a range that starts at index 0. It kills the most common off-by-one bug before it happens. <strong>Pick this convention and never look back.</strong>
+    </div>
+  </section>
+
+  <!-- ============ INTERACTIVE ============ -->
+  <section class="reveal">
+    <div class="demo" id="demo">
+      <h3>Try it — the subtraction, live</h3>
+      <p class="hint">Tap two cells to pick a range's <strong>start</strong> and <strong>end</strong>. Watch the answer come from one subtraction of the prefix track below.</p>
+      <div class="dcells" id="dcells"></div>
+      <div class="lblrow" style="text-align:center">prefix track</div>
+      <div class="dtrack" id="dtrack"></div>
+      <div class="dout" id="dout">Tap a cell to set the start of your range…</div>
+      <div class="dbtn"><button id="dreset" type="button">Reset</button></div>
+    </div>
+  </section>
+
+  <!-- ============ 2. IDENTIFY ============ -->
+  <section class="reveal">
+    <div class="sec-head"><span class="sec-num">02</span><h2>How to spot it</h2></div>
+    <p class="sec-sub">Five phrases in a problem statement that should make you reach for prefix sum.</p>
+
+    <div class="signals">
+      <div class="signal">
+        <div class="k k1">Σ</div>
+        <div class="txt"><strong>"Sum over a range [L, R]" — asked many times</strong>
+        <span>Repeated range totals on a fixed array. <span class="arrow">→ 1D prefix sum.</span> Build once, each query O(1).</span></div>
+      </div>
+      <div class="signal">
+        <div class="k k2">#</div>
+        <div class="txt"><strong>"Count / length of subarrays whose sum = k (or divisible by k, or has parity…)"</strong>
+        <span>Counting subarrays by a sum condition. <span class="arrow">→ prefix sum + HashMap.</span> Works even with negative numbers (which is exactly when sliding window fails).</span></div>
+      </div>
+      <div class="signal">
+        <div class="k k3">±</div>
+        <div class="txt"><strong>"Add x to every element in range [L, R]" — many updates, read once at the end</strong>
+        <span>Range <em>updates</em>, not queries. <span class="arrow">→ difference array</span> (prefix sum run in reverse). Mark two boundaries per update, sweep once.</span></div>
+      </div>
+      <div class="signal">
+        <div class="k k4">▦</div>
+        <div class="txt"><strong>"Sum of a submatrix / rectangle" — repeatedly</strong>
+        <span>The 2D version. <span class="arrow">→ 2D prefix sum</span> with inclusion–exclusion. Each rectangle in O(1).</span></div>
+      </div>
+      <div class="signal">
+        <div class="k k5">⊕</div>
+        <div class="txt"><strong>The word "sum" swapped for XOR, product, or a running count</strong>
+        <span>Same trick, different operator. <span class="arrow">→ prefix XOR / prefix product / prefix count</span> — as long as the operation has an inverse.</span></div>
+      </div>
+    </div>
+
+    <h3>The mirror image — when it's <em>not</em> prefix sum</h3>
+    <p>Just as important. If you feel the pull toward prefix sum here, resist:</p>
+    <div class="tbl-scroll">
+      <table class="cheat">
+        <tr><th>The problem wants…</th><th>Use instead</th><th>Why prefix sum fails</th></tr>
+        <tr><td>Longest/shortest subarray with sum ≤ / ≥ target, all values positive</td><td class="go">Sliding window</td><td>Window is O(1) space and simpler when the condition is monotonic</td></tr>
+        <tr><td>Range <b>min / max / gcd</b></td><td class="go">Sparse table / Segment tree</td><td>No inverse — you can't "subtract" a max back out</td></tr>
+        <tr><td>Updates <b>and</b> queries interleaved</td><td class="go">Fenwick tree (BIT)</td><td>Every update forces an O(n) rebuild of the prefix</td></tr>
+      </table>
+    </div>
+    <div class="note"><span class="lbl">Fast rule</span> Sums + a fixed array + repeated range questions → prefix sum. Add a HashMap the moment the problem says "count subarrays." Anything with min/max, or updates mixed into queries, is a different tool.</div>
+  </section>
+
+  <!-- ============ 3. THE METHOD ============ -->
+  <section class="reveal">
+    <div class="sec-head"><span class="sec-num">03</span><h2>The method, step by step</h2></div>
+    <p class="sec-sub">The same identify → brute → dry-run → optimise loop you use for DP. We'll thread one problem through it: <em>count the subarrays whose sum equals k</em>.</p>
+
+    <div class="step">
+      <div class="n">1</div>
+      <div class="b">
+        <h3>Identify the signal</h3>
+        <p>"Count subarrays with sum = k" is signal #2 above — a counting-by-sum problem. Flag it as <span class="pill p-ans">prefix + hashmap</span> in your head and move on. Don't optimise yet.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="n">2</div>
+      <div class="b">
+        <h3>Write the brute force &amp; dry-run it</h3>
+        <p>Always write the dumb version first — it defines "correct" and reveals the waste. Fix a start <code class="inl">i</code>, extend to every end <code class="inl">j</code>, keep a running sum:</p>
+<pre><span class="cm">// Brute force — O(n²)</span>
+<span class="kw">int</span> count = <span class="nm">0</span>;
+<span class="kw">for</span> (<span class="kw">int</span> i = <span class="nm">0</span>; i &lt; n; i++) {
+    <span class="kw">long</span> sum = <span class="nm">0</span>;
+    <span class="kw">for</span> (<span class="kw">int</span> j = i; j &lt; n; j++) {
+        sum += nums[j];          <span class="cm">// extend the window</span>
+        <span class="kw">if</span> (sum == k) count++;
+    }
+}</pre>
+        <p>Dry-run it on <code class="inl">[1, -1, 1, 1]</code>, k = 1. Start i=0: sums 1,0,1,2 — two hits. Start i=1: sums -1,0,1 — one hit. And so on. It works. But notice what your hand is doing…</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="n">3</div>
+      <div class="b">
+        <h3>Spot the wasted work</h3>
+        <p>Every new start <code class="inl">i</code> re-adds elements you already summed for earlier starts. The running total <code class="inl">nums[i..j]</code> is just <code class="inl">prefix[j+1] − prefix[i]</code> — a fact you're recomputing by hand each pass. <strong>That repetition is the thing to kill.</strong></p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="n">4</div>
+      <div class="b">
+        <h3>Optimise — two moves</h3>
+        <p><strong>Move A (obvious):</strong> precompute the prefix array, so any <code class="inl">sum(i..j)</code> is O(1). That already turns a naive O(n³) into O(n²).</p>
+        <p><strong>Move B (the leap):</strong> re-read the identity. A subarray ending at <code class="inl">j</code> has sum k exactly when</p>
+        <div class="formula">prefix[j+1] &minus; <span class="cut">prefix[i]</span> = k &nbsp;&nbsp;⟺&nbsp;&nbsp; <span class="cut">prefix[i]</span> = <b>prefix[j+1]</b> &minus; k</div>
+        <p>So instead of searching for the start, <strong>count how many earlier prefix values equal <code class="inl">(current − k)</code></strong>. A HashMap of "prefix value → how many times I've seen it" answers that in O(1). One pass, O(n).</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="n">5</div>
+      <div class="b">
+        <h3>Nail the edge cases</h3>
+        <p>Three that bite everyone — see the <a href="#pitfalls">pitfalls</a> section for the full list. The big one here: seed the map with <code class="inl">{0 : 1}</code> before the loop. That empty-prefix entry is what lets a subarray starting at index 0 (or the whole array) get counted.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 4. WORKED: 560 ============ -->
+  <section class="reveal">
+    <div class="sec-head"><span class="sec-num">04</span><h2>Worked example: Subarray Sum Equals K</h2></div>
+    <p class="sec-sub"><a href="https://leetcode.com/problems/subarray-sum-equals-k/" target="_blank" rel="noopener">LeetCode 560 · Medium</a> — the single most important prefix-sum-plus-hashmap problem. Learn this one cold and a dozen others fall.</p>
+
+    <p>Final code, straight from Move B above:</p>
+<pre><span class="kw">public int</span> <span class="fn">subarraySum</span>(<span class="kw">int</span>[] nums, <span class="kw">int</span> k) {
+    <span class="ty">Map</span>&lt;<span class="ty">Long</span>, <span class="ty">Integer</span>&gt; seen = <span class="kw">new</span> <span class="ty">HashMap</span>&lt;&gt;();
+    seen.put(<span class="nm">0L</span>, <span class="nm">1</span>);                    <span class="cm">// the empty prefix — do NOT forget</span>
+    <span class="kw">long</span> sum = <span class="nm">0</span>;
+    <span class="kw">int</span> count = <span class="nm">0</span>;
+    <span class="kw">for</span> (<span class="kw">int</span> num : nums) {
+        sum += num;                          <span class="cm">// running prefix</span>
+        count += seen.getOrDefault(sum - k, <span class="nm">0</span>);  <span class="cm">// earlier prefixes = sum-k</span>
+        seen.merge(sum, <span class="nm">1</span>, <span class="ty">Integer</span>::sum);       <span class="cm">// record this prefix</span>
+    }
+    <span class="kw">return</span> count;
+}</pre>
+
+    <h3>The dry run — watch the map do the work</h3>
+    <p>Input <code class="inl">nums = [1, -1, 1, 1]</code>, <code class="inl">k = 1</code>. Correct answer is <strong>5</strong>. Follow the highlighted rows where the map hands us a match:</p>
+
+    <div class="tbl-scroll">
+      <table>
+        <tr>
+          <th>num</th><th>sum</th><th>look for<br>(sum−k)</th><th>found in<br>map?</th><th>count</th><th>map after</th>
+        </tr>
+        <tr><td class="lead">start</td><td>0</td><td>—</td><td>—</td><td>0</td><td>{0:1}</td></tr>
+        <tr><td class="lead">1</td><td>1</td><td>0</td><td class="hit">yes ×1</td><td>1</td><td>{0:1, 1:1}</td></tr>
+        <tr><td class="lead">−1</td><td>0</td><td>−1</td><td>no</td><td>1</td><td>{0:2, 1:1}</td></tr>
+        <tr><td class="lead">1</td><td>1</td><td>0</td><td class="hit">yes ×2</td><td>3</td><td>{0:2, 1:2}</td></tr>
+        <tr><td class="lead">1</td><td>2</td><td>1</td><td class="hit">yes ×2</td><td>5</td><td>{0:2, 1:2, 2:1}</td></tr>
+      </table>
+    </div>
+    <p class="tcap">Row 4 is the "aha": <code style="font-size:12px">sum−k = 0</code> and we'd seen prefix 0 <b>twice</b> (start, and after the −1) — so two subarrays end here. That's why the map stores <em>counts</em>, not just yes/no. This is also why negatives are no problem: no window assumption anywhere.</p>
+
+    <div class="note"><span class="lbl">Pattern transfer</span> Swap the running sum for a running <em>remainder</em> and you've solved <a href="https://leetcode.com/problems/subarray-sums-divisible-by-k/" target="_blank" rel="noopener">Subarray Sums Divisible by K (974)</a>. Swap it for a running count of odd numbers and you've solved <a href="https://leetcode.com/problems/count-number-of-nice-subarrays/" target="_blank" rel="noopener">Count Nice Subarrays (1248)</a>. Same skeleton, different thing you accumulate.</div>
+  </section>
+
+  <!-- ============ 5. WORKED: 303 ============ -->
+  <section class="reveal">
+    <div class="sec-head"><span class="sec-num">05</span><h2>The pure form: Range Sum Query</h2></div>
+    <p class="sec-sub"><a href="https://leetcode.com/problems/range-sum-query-immutable/" target="_blank" rel="noopener">LeetCode 303 · Easy</a> — prefix sum with nothing else attached. If #04 felt like a lot, this is the technique on its own.</p>
+
+    <p>Build the prefix once in the constructor; every query is a subtraction:</p>
+<pre><span class="kw">class</span> <span class="ty">NumArray</span> {
+    <span class="kw">private final int</span>[] prefix;      <span class="cm">// prefix[i] = sum of first i elements</span>
+
+    <span class="kw">public</span> <span class="fn">NumArray</span>(<span class="kw">int</span>[] nums) {
+        prefix = <span class="kw">new int</span>[nums.length + <span class="nm">1</span>];
+        <span class="kw">for</span> (<span class="kw">int</span> i = <span class="nm">0</span>; i &lt; nums.length; i++)
+            prefix[i + <span class="nm">1</span>] = prefix[i] + nums[i];
+    }
+
+    <span class="kw">public int</span> <span class="fn">sumRange</span>(<span class="kw">int</span> left, <span class="kw">int</span> right) {
+        <span class="kw">return</span> prefix[right + <span class="nm">1</span>] - prefix[left];   <span class="cm">// O(1)</span>
+    }
+}</pre>
+    <p>Build cost O(n), paid once. Each of the (potentially thousands of) queries is O(1) instead of O(n). That trade — a little setup for cheap-forever queries — is the entire reason the technique exists.</p>
+  </section>
+
+  <!-- ============ 6. DIFFERENCE ARRAY ============ -->
+  <section class="reveal">
+    <div class="sec-head"><span class="sec-num">06</span><h2>Prefix sum in reverse: the difference array</h2></div>
+    <p class="sec-sub">When the problem is many range <em>updates</em> and one final read, flip the whole idea around.</p>
+
+    <p>A prefix sum turns an array into its running totals. A <strong>difference array</strong> is the inverse: it stores the change at each step, and running a prefix sum over it <em>reconstructs</em> the array. The magic: to add <code class="inl">x</code> across a whole range <code class="inl">[L, R]</code>, you only touch <strong>two</strong> cells.</p>
+
+    <div class="fig">
+      <div class="lblrow">To add <span style="color:var(--add)">+x</span> over range [L, R]:</div>
+      <div class="cells" style="margin-top:20px">
+        <div class="cell"><span class="ix">…</span>·</div>
+        <div class="cell add"><span class="ix">L</span>+x</div>
+        <div class="cell"><span class="ix"></span>·</div>
+        <div class="cell"><span class="ix"></span>·</div>
+        <div class="cell"><span class="ix"></span>·</div>
+        <div class="cell cut"><span class="ix">R+1</span>&minus;x</div>
+        <div class="cell"><span class="ix">…</span>·</div>
+      </div>
+      <div class="cap"><span style="color:var(--add)">turn the effect ON at L</span> &nbsp; · &nbsp; <span style="color:var(--cut)">turn it OFF just past R</span> &nbsp; · &nbsp; then one prefix sum "spreads" the +x across the middle</div>
+    </div>
+
+    <p>Take <a href="https://leetcode.com/problems/corporate-flight-bookings/" target="_blank" rel="noopener">Corporate Flight Bookings (1109)</a>: each booking reserves seats on a range of flights, and you want the final total per flight. Naively updating every flight in every range is O(bookings × n). With a difference array it's O(bookings + n):</p>
+<pre><span class="kw">public int</span>[] <span class="fn">corpFlightBookings</span>(<span class="kw">int</span>[][] bookings, <span class="kw">int</span> n) {
+    <span class="kw">int</span>[] diff = <span class="kw">new int</span>[n + <span class="nm">1</span>];         <span class="cm">// one guard slot</span>
+    <span class="kw">for</span> (<span class="kw">int</span>[] b : bookings) {
+        <span class="kw">int</span> first = b[<span class="nm">0</span>], last = b[<span class="nm">1</span>], seats = b[<span class="nm">2</span>];
+        diff[first - <span class="nm">1</span>] += seats;        <span class="cm">// 1-indexed flights → 0-indexed array</span>
+        diff[last]      -= seats;        <span class="cm">// cancel just after the range</span>
+    }
+    <span class="kw">int</span>[] answer = <span class="kw">new int</span>[n];
+    <span class="kw">int</span> running = <span class="nm">0</span>;
+    <span class="kw">for</span> (<span class="kw">int</span> i = <span class="nm">0</span>; i &lt; n; i++) {
+        running += diff[i];              <span class="cm">// prefix sum rebuilds the totals</span>
+        answer[i] = running;
+    }
+    <span class="kw">return</span> answer;
+}</pre>
+    <div class="note"><span class="lbl">Same shape, different clothes</span> <a href="https://leetcode.com/problems/car-pooling/" target="_blank" rel="noopener">Car Pooling (1094)</a> is this exact idea — passengers board at <code class="inl">from</code>, leave at <code class="inl">to</code> — then you check the running total never exceeds capacity.</div>
+  </section>
+
+  <!-- ============ 7. VARIANTS ============ -->
+  <section class="reveal">
+    <div class="sec-head"><span class="sec-num">07</span><h2>Same trick, new operators</h2></div>
+    <p class="sec-sub">Once the shape clicks, you'll see it wearing disguises.</p>
+
+    <h3>2D prefix sum — sums over rectangles</h3>
+    <p>Build a grid where each cell holds the sum of everything above-and-left of it. A rectangle's sum comes out by <strong>inclusion–exclusion</strong>: take the big block, subtract the strip above and the strip to the left, then <em>add back</em> the top-left corner you subtracted twice.</p>
+
+    <div class="fig">
+      <svg viewBox="0 0 360 200" role="img" aria-label="2D prefix sum inclusion-exclusion diagram">
+        <!-- big block A -->
+        <rect x="30" y="20" width="180" height="120" fill="#E7ECFD" stroke="#3B5BDB" stroke-width="1.5"/>
+        <!-- top strip -->
+        <rect x="30" y="20" width="180" height="40" fill="#FBE6EC" opacity=".75"/>
+        <!-- left strip -->
+        <rect x="30" y="20" width="60" height="120" fill="#FBE6EC" opacity=".75"/>
+        <!-- overlap corner -->
+        <rect x="30" y="20" width="60" height="40" fill="#EEE8FB" stroke="#7A52D6" stroke-width="1.2"/>
+        <!-- target region -->
+        <rect x="90" y="60" width="120" height="80" fill="#E1F4F1" stroke="#0E9D8C" stroke-width="1.8"/>
+        <text x="150" y="105" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" fill="#0b6b5f" font-weight="600">target</text>
+        <text x="60" y="44" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#5a37a8">added</text>
+        <text x="60" y="55" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#5a37a8">back</text>
+        <!-- legend -->
+        <g font-family="IBM Plex Sans" font-size="11">
+          <rect x="240" y="30" width="14" height="14" fill="#E7ECFD" stroke="#3B5BDB"/>
+          <text x="260" y="41" fill="#243049">whole block</text>
+          <rect x="240" y="54" width="14" height="14" fill="#FBE6EC"/>
+          <text x="260" y="65" fill="#243049">− top & left</text>
+          <rect x="240" y="78" width="14" height="14" fill="#EEE8FB" stroke="#7A52D6"/>
+          <text x="260" y="89" fill="#243049">+ corner</text>
+          <rect x="240" y="102" width="14" height="14" fill="#E1F4F1" stroke="#0E9D8C"/>
+          <text x="260" y="113" fill="#243049">= target</text>
+        </g>
+      </svg>
+      <div class="cap">region = pre[r2+1][c2+1] − pre[r1][c2+1] − pre[r2+1][c1] + pre[r1][c1]</div>
+    </div>
+<pre><span class="cm">// query, after building pre[][] with a zero border</span>
+<span class="kw">public int</span> <span class="fn">sumRegion</span>(<span class="kw">int</span> r1, <span class="kw">int</span> c1, <span class="kw">int</span> r2, <span class="kw">int</span> c2) {
+    <span class="kw">return</span> pre[r2+<span class="nm">1</span>][c2+<span class="nm">1</span>]
+         - pre[r1][c2+<span class="nm">1</span>] - pre[r2+<span class="nm">1</span>][c1]
+         + pre[r1][c1];
+}</pre>
+    <p style="margin-top:-4px">See <a href="https://leetcode.com/problems/range-sum-query-2d-immutable/" target="_blank" rel="noopener">Range Sum Query 2D (304)</a> and <a href="https://leetcode.com/problems/matrix-block-sum/" target="_blank" rel="noopener">Matrix Block Sum (1314)</a>.</p>
+
+    <h3>Prefix XOR — because XOR is its own inverse</h3>
+    <p>Subtraction undoes addition; XOR undoes itself (<code class="inl">a ^ a = 0</code>). So the range formula reads identically with <code class="inl">^</code>: the XOR of <code class="inl">[l..r]</code> is <code class="inl">prefixXor[r+1] ^ prefixXor[l]</code>. That's the whole trick behind <a href="https://leetcode.com/problems/xor-queries-of-a-subarray/" target="_blank" rel="noopener">XOR Queries of a Subarray (1310)</a>.</p>
+
+    <h3>Prefix + suffix products — division-free</h3>
+    <p><a href="https://leetcode.com/problems/product-of-array-except-self/" target="_blank" rel="noopener">Product of Array Except Self (238)</a> asks for the product of all elements except each one, without using division. Answer: multiply the product of everything <em>before</em> i by the product of everything <em>after</em> i — a prefix pass and a suffix pass.</p>
+<pre><span class="kw">public int</span>[] <span class="fn">productExceptSelf</span>(<span class="kw">int</span>[] nums) {
+    <span class="kw">int</span> n = nums.length;
+    <span class="kw">int</span>[] ans = <span class="kw">new int</span>[n];
+    ans[<span class="nm">0</span>] = <span class="nm">1</span>;
+    <span class="kw">for</span> (<span class="kw">int</span> i = <span class="nm">1</span>; i &lt; n; i++) ans[i] = ans[i-<span class="nm">1</span>] * nums[i-<span class="nm">1</span>];  <span class="cm">// prefix product</span>
+    <span class="kw">int</span> suffix = <span class="nm">1</span>;
+    <span class="kw">for</span> (<span class="kw">int</span> i = n-<span class="nm">1</span>; i &gt;= <span class="nm">0</span>; i--) {                          <span class="cm">// fold in suffix</span>
+        ans[i] *= suffix;
+        suffix *= nums[i];
+    }
+    <span class="kw">return</span> ans;
+}</pre>
+  </section>
+
+  <!-- ============ 8. PITFALLS ============ -->
+  <section class="reveal" id="pitfalls">
+    <div class="sec-head"><span class="sec-num">08</span><h2>The five bugs everyone writes</h2></div>
+    <p class="sec-sub">Memorise these; they'll save you a dozen failed submissions.</p>
+
+    <div class="warn"><span class="lbl">Bug 1 · Off-by-one</span> Mixing conventions mid-solution. Commit to <strong>length n+1, leading 0</strong>, so <code class="inl">sum(i..j) = prefix[j+1] − prefix[i]</code>. Write that formula in a comment and check every index against it.</div>
+
+    <div class="warn"><span class="lbl">Bug 2 · Forgetting {0:1}</span> In every prefix+hashmap solution, seed the map with the empty prefix before the loop. Skip it and you undercount every subarray that starts at index 0 — including the whole-array answer.</div>
+
+    <div class="warn"><span class="lbl">Bug 3 · Integer overflow</span> A running sum of 10⁵ elements can blow past <code class="inl">int</code>. Products overflow almost instantly. <strong>Default the accumulator to <code class="inl">long</code></strong> unless you've proven the range is safe.</div>
+
+    <div class="warn"><span class="lbl">Bug 4 · Negative modulo</span> For "divisible by k" counting, Java's <code class="inl">%</code> can return a negative remainder. Normalise it: <code class="inl">((sum % k) + k) % k</code>, then group by remainder in the map.</div>
+
+    <div class="warn"><span class="lbl">Bug 5 · Reaching for prefix on min/max</span> There is no inverse for max, min, or gcd — you can't subtract a maximum back out. Those need a sparse table or segment tree, not a prefix array.</div>
+  </section>
+
+  <!-- ============ 9. PROBLEM LADDER ============ -->
+  <section class="reveal">
+    <div class="sec-head"><span class="sec-num">09</span><h2>The practice ladder</h2></div>
+    <p class="sec-sub">Climb it in order. Each tier locks in one idea before the next stacks on top. Tiers 2 and 6 are the "prefix sum can't do it alone" problems you asked about — they marry the prefix idea to a HashMap, a suffix pass, or a DP.</p>
+
+    <!-- TIER 1 -->
+    <div class="tier">
+      <div class="tier-h"><h3>Tier 1 — Build the reflex</h3><span class="tier-tag p-add">pure 1D prefix</span></div>
+      <p class="tier-desc">Just build and subtract. Do these until the pattern is muscle memory.</p>
+      <div class="prob"><span class="nm-t">Running Sum of 1d Array</span><span><span class="num">1480</span> <span class="diff d-e">Easy</span></span><span class="drill"><a href="https://leetcode.com/problems/running-sum-of-1d-array/" target="_blank" rel="noopener">open ↗</a> — <b>drills:</b> literally constructing the prefix array, in place.</span></div>
+      <div class="prob"><span class="nm-t">Find the Highest Altitude</span><span><span class="num">1732</span> <span class="diff d-e">Easy</span></span><span class="drill"><a href="https://leetcode.com/problems/find-the-highest-altitude/" target="_blank" rel="noopener">open ↗</a> — <b>drills:</b> running total + track the max along the way.</span></div>
+      <div class="prob"><span class="nm-t">Range Sum Query — Immutable</span><span><span class="num">303</span> <span class="diff d-e">Easy</span></span><span class="drill"><a href="https://leetcode.com/problems/range-sum-query-immutable/" target="_blank" rel="noopener">open ↗</a> — <b>drills:</b> the canonical build-once, query-O(1) trade.</span></div>
+      <div class="prob"><span class="nm-t">Find Pivot Index</span><span><span class="num">724</span> <span class="diff d-e">Easy</span></span><span class="drill"><a href="https://leetcode.com/problems/find-pivot-index/" target="_blank" rel="noopener">open ↗</a> — <b>drills:</b> left sum vs right sum via <code style="font-size:12px">total − prefix − self</code>.</span></div>
+      <div class="prob"><span class="nm-t">Minimum Value to Get Positive Step by Step Sum</span><span><span class="num">1413</span> <span class="diff d-e">Easy</span></span><span class="drill"><a href="https://leetcode.com/problems/minimum-value-to-get-positive-step-by-step-sum/" target="_blank" rel="noopener">open ↗</a> — <b>drills:</b> track the minimum running prefix.</span></div>
+      <div class="prob"><span class="nm-t">Sum of Absolute Differences in a Sorted Array</span><span><span class="num">1685</span> <span class="diff d-m">Med</span></span><span class="drill"><a href="https://leetcode.com/problems/sum-of-absolute-differences-in-a-sorted-array/" target="_blank" rel="noopener">open ↗</a> — <b>drills:</b> split a sum into a left part and right part using prefixes.</span></div>
+    </div>
+
+    <!-- TIER 2 -->
+    <div class="tier">
+      <div class="tier-h"><h3>Tier 2 — Prefix + HashMap</h3><span class="tier-tag p-ans">prefix can't do it alone</span></div>
+      <p class="tier-desc">Counting subarrays by a sum condition. The map is the second half of the trick. Master 560 first, then the rest are re-skins.</p>
+      <div class="prob"><span class="nm-t">Subarray Sum Equals K</span><span><span class="num">560</span> <span class="diff d-m">Med</span></span><span class="drill"><a href="https://leetcode.com/problems/subarray-sum-equals-k/" target="_blank" rel="noopener">open ↗</a> — <b>the template.</b> Count earlier prefixes equal to <code style="font-size:12px">sum−k</code>.</span></div>
+      <div class="prob"><span class="nm-t">Subarray Sums Divisible by K</span><span><span class="num">974</span> <span class="diff d-m">Med</span></span><span class="drill"><a href="https://leetcode.com/problems/subarray-sums-divisible-by-k/" target="_blank" rel="noopener">open ↗</a> — <b>drills:</b> group by remainder; watch the negative-modulo bug.</span></div>
+      <div class="prob"><span class="nm-t">Continuous Subarray Sum</span><span><span class="num">523</span> <span class="diff d-m">Med</span></span><span class="drill"><a href="https://leetcode.com/problems/continuous-subarray-sum/" target="_blank" rel="noopener">open ↗</a> — <b>drills:</b> store the first index a remainder appears (length, not count).</span></div>
+      <div class="prob"><span class="nm-t">Contiguous Array</span><span><span class="num">525</span> <span class="diff d-m">Med</span></span><span class="drill"><a href="https://leetcode.com/problems/contiguous-array/" target="_blank" rel="noopener">open ↗</a> — <b>drills:</b> map 0→−1 so "equal 0s and 1s" becomes "sum = 0".</span></div>
+      <div class="prob"><span class="nm-t">Binary Subarrays With Sum</span><span><span class="num">930</span> <span class="diff d-m">Med</span></span><span class="drill"><a href="https://leetcode.com/problems/binary-subarrays-with-sum/" target="_blank" rel="noopener">open ↗</a> — <b>drills:</b> the counting template on a 0/1 array.</span></div>
+      <div class="prob"><span class="nm-t">Count Number of Nice Subarrays</span><span><span class="num">1248</span> <span class="diff d-m">Med</span></span><span class="drill"><a href="https://leetcode.com/problems/count-number-of-nice-subarrays/" target="_blank" rel="noopener">open ↗</a> — <b>drills:</b> accumulate a count of odds instead of a sum.</span></div>
+      <div class="prob"><span class="nm-t">Number of Sub-arrays With Odd Sum</span><span><span class="num">1524</span> <span class="diff d-m">Med</span></span><span class="drill"><a href="https://leetcode.com/problems/number-of-sub-arrays-with-odd-sum/" target="_blank" rel="noopener">open ↗</a> — <b>drills:</b> track prefix parity (only two buckets needed).</span></div>
+      <div class="prob"><span class="nm-t">Path Sum III</span><span><span class="num">437</span> <span class="diff d-m">Med</span></span><span class="drill"><a href="https://leetcode.com/problems/path-sum-iii/" target="_blank" rel="noopener">open ↗</a> — <b>drills:</b> the 560 trick on a <em>tree</em> — prefix sums along a root-to-node path.</span></div>
+    </div>
+
+    <!-- TIER 3 -->
+    <div class="tier">
+      <div class="tier-h"><h3>Tier 3 — Prefix XOR</h3><span class="tier-tag p-add">different operator</span></div>
+      <p class="tier-desc">Everything above, but the running value is a XOR. Proves the pattern isn't really about addition.</p>
+      <div class="prob"><span class="nm-t">XOR Queries of a Subarray</span><span><span class="num">1310</span> <span class="diff d-m">Med</span></span><span class="drill"><a href="https://leetcode.com/problems/xor-queries-of-a-subarray/" target="_blank" rel="noopener">open ↗</a> — <b>drills:</b> range XOR = <code style="font-size:12px">pre[r+1] ^ pre[l]</code>.</span></div>
+      <div class="prob"><span class="nm-t">Count Triplets That Form Two Arrays of Equal XOR</span><span><span class="num">1442</span> <span class="diff d-m">Med</span></span><span class="drill"><a href="https://leetcode.com/problems/count-triplets-that-can-form-two-arrays-of-equal-xor/" target="_blank" rel="noopener">open ↗</a> — <b>drills:</b> equal XOR of two halves ⟺ prefix XORs match.</span></div>
+    </div>
+
+    <!-- TIER 4 -->
+    <div class="tier">
+      <div class="tier-h"><h3>Tier 4 — 2D prefix sum</h3><span class="tier-tag p-zero">inclusion–exclusion</span></div>
+      <p class="tier-desc">The grid version. Get the four-term query formula and the zero-border right.</p>
+      <div class="prob"><span class="nm-t">Range Sum Query 2D — Immutable</span><span><span class="num">304</span> <span class="diff d-m">Med</span></span><span class="drill"><a href="https://leetcode.com/problems/range-sum-query-2d-immutable/" target="_blank" rel="noopener">open ↗</a> — <b>drills:</b> the canonical 2D build + 4-term query.</span></div>
+      <div class="prob"><span class="nm-t">Matrix Block Sum</span><span><span class="num">1314</span> <span class="diff d-m">Med</span></span><span class="drill"><a href="https://leetcode.com/problems/matrix-block-sum/" target="_blank" rel="noopener">open ↗</a> — <b>drills:</b> clamp a k-radius box to the grid edges.</span></div>
+      <div class="prob"><span class="nm-t">Number of Submatrices That Sum to Target</span><span><span class="num">1074</span> <span class="diff d-h">Hard</span></span><span class="drill"><a href="https://leetcode.com/problems/number-of-submatrices-that-sum-to-target/" target="_blank" rel="noopener">open ↗</a> — <b>drills:</b> collapse rows, then run the 560 map per column band.</span></div>
+      <div class="prob"><span class="nm-t">Max Sum of Rectangle No Larger Than K</span><span><span class="num">363</span> <span class="diff d-h">Hard</span></span><span class="drill"><a href="https://leetcode.com/problems/max-sum-of-rectangle-no-larger-than-k/" target="_blank" rel="noopener">open ↗</a> — <b>drills:</b> prefix sums + a sorted-set search. A real stretch.</span></div>
+    </div>
+
+    <!-- TIER 5 -->
+    <div class="tier">
+      <div class="tier-h"><h3>Tier 5 — Difference array</h3><span class="tier-tag p-cut">prefix in reverse</span></div>
+      <p class="tier-desc">Range updates, one final read. Mark two boundaries, sweep once.</p>
+      <div class="prob"><span class="nm-t">Range Addition</span><span><span class="num">370</span> <span class="diff d-m">Med</span></span><span class="drill"><a href="https://leetcode.com/problems/range-addition/" target="_blank" rel="noopener">open ↗</a> — <b>the template.</b> The purest difference-array problem.</span></div>
+      <div class="prob"><span class="nm-t">Corporate Flight Bookings</span><span><span class="num">1109</span> <span class="diff d-m">Med</span></span><span class="drill"><a href="https://leetcode.com/problems/corporate-flight-bookings/" target="_blank" rel="noopener">open ↗</a> — <b>drills:</b> 1-indexed ranges → 0-indexed diff (worked above).</span></div>
+      <div class="prob"><span class="nm-t">Car Pooling</span><span><span class="num">1094</span> <span class="diff d-m">Med</span></span><span class="drill"><a href="https://leetcode.com/problems/car-pooling/" target="_blank" rel="noopener">open ↗</a> — <b>drills:</b> diff over a timeline, then check a capacity bound.</span></div>
+    </div>
+
+    <!-- TIER 6 -->
+    <div class="tier">
+      <div class="tier-h"><h3>Tier 6 — Prefix + another idea</h3><span class="tier-tag p-ans">combos</span></div>
+      <p class="tier-desc">Prefix is one ingredient among several — suffix passes, splits, and DP. This is where "just prefix sum" stops being enough.</p>
+      <div class="prob"><span class="nm-t">Product of Array Except Self</span><span><span class="num">238</span> <span class="diff d-m">Med</span></span><span class="drill"><a href="https://leetcode.com/problems/product-of-array-except-self/" target="_blank" rel="noopener">open ↗</a> — <b>prefix + suffix</b> products (worked above).</span></div>
+      <div class="prob"><span class="nm-t">Number of Ways to Split Array</span><span><span class="num">2270</span> <span class="diff d-m">Med</span></span><span class="drill"><a href="https://leetcode.com/problems/number-of-ways-to-split-array/" target="_blank" rel="noopener">open ↗</a> — <b>prefix vs suffix:</b> compare left sum to right sum at each cut.</span></div>
+      <div class="prob"><span class="nm-t">Ways to Split Array Into Three Subarrays</span><span><span class="num">1712</span> <span class="diff d-m">Med</span></span><span class="drill"><a href="https://leetcode.com/problems/ways-to-split-array-into-three-subarrays/" target="_blank" rel="noopener">open ↗</a> — <b>prefix + binary search</b> for the valid range of the second cut.</span></div>
+      <div class="prob"><span class="nm-t">Maximum Sum of 3 Non-Overlapping Subarrays</span><span><span class="num">689</span> <span class="diff d-h">Hard</span></span><span class="drill"><a href="https://leetcode.com/problems/maximum-sum-of-3-non-overlapping-subarrays/" target="_blank" rel="noopener">open ↗</a> — <b>prefix sums + DP</b> over best-left / best-right windows.</span></div>
+    </div>
+  </section>
+
+  <!-- ============ CHEAT SHEET ============ -->
+  <section class="reveal">
+    <div class="sec-head"><span class="sec-num">10</span><h2>One-glance decision sheet</h2></div>
+    <div class="card" style="padding:6px 8px">
+    <div class="tbl-scroll" style="border:none">
+      <table class="cheat">
+        <tr><th>You see…</th><th>Reach for</th></tr>
+        <tr><td>Repeated range sums, fixed array</td><td class="go">1D prefix sum</td></tr>
+        <tr><td>"Count subarrays with sum = / ÷ / parity condition"</td><td class="go">prefix + HashMap (seed {0:1})</td></tr>
+        <tr><td>Many range +x updates, read once at end</td><td class="go">difference array</td></tr>
+        <tr><td>Repeated submatrix sums</td><td class="go">2D prefix sum (4-term query)</td></tr>
+        <tr><td>Range XOR / product</td><td class="go">prefix XOR / prefix product</td></tr>
+        <tr><td>"Except self" / split into parts</td><td class="go">prefix + suffix pass</td></tr>
+        <tr><td>Longest/shortest with monotonic condition, positives</td><td class="no">sliding window (not prefix)</td></tr>
+        <tr><td>Range min / max / gcd</td><td class="no">sparse table / segment tree</td></tr>
+        <tr><td>Updates + queries interleaved</td><td class="no">Fenwick tree (BIT)</td></tr>
+      </table>
+    </div>
+    </div>
+    <div class="note"><span class="lbl">The reflex to build</span> "Am I recomputing overlapping sums?" If yes, a prefix array deletes that work. "Am I updating the same range over and over?" If yes, a difference array does. Everything on this page is one of those two questions.</div>
+  </section>
+
+  <footer>
+    Prefix Sum Playbook · identify → brute force → dry run → optimise · Java · problem numbers are LeetCode
+  </footer>
+
+</div>
+
+<script>
+(function(){
+  // ---------- interactive range demo ----------
+  var arr = [3,1,4,1,5,9,2,6];
+  var n = arr.length;
+  var prefix = [0];
+  for (var i=0;i<n;i++) prefix.push(prefix[i]+arr[i]);
+
+  var cellsEl = document.getElementById('dcells');
+  var trackEl = document.getElementById('dtrack');
+  var outEl   = document.getElementById('dout');
+  var L=null, R=null;
+
+  // build value cells
+  arr.forEach(function(v,idx){
+    var d=document.createElement('div');
+    d.className='dcell'; d.tabIndex=0; d.setAttribute('role','button');
+    d.setAttribute('aria-label','element '+idx+' value '+v);
+    d.innerHTML='<span class="dv">'+v+'</span><span class="di">'+idx+'</span>';
+    d.addEventListener('click',function(){pick(idx);});
+    d.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();pick(idx);}});
+    cellsEl.appendChild(d);
+  });
+  // build prefix track
+  prefix.forEach(function(v,idx){
+    var t=document.createElement('div');
+    t.className='ptile';
+    t.innerHTML=v+'<sub style="font-size:9px;color:#8B94A3">&nbsp;'+idx+'</sub>';
+    trackEl.appendChild(t);
+  });
+
+  function pick(idx){
+    if(L===null){ L=idx; R=null; }
+    else if(R===null){
+      if(idx<L){ R=L; L=idx; } else { R=idx; }
+    } else { L=idx; R=null; }
+    render();
+  }
+
+  function render(){
+    var cs=cellsEl.children, ts=trackEl.children;
+    for(var i=0;i<n;i++){ cs[i].classList.remove('sel'); }
+    for(var j=0;j<ts.length;j++){ ts[j].classList.remove('hiL','hiR'); }
+
+    if(L!==null && R===null){
+      cs[L].classList.add('sel');
+      outEl.innerHTML='start = index <span class="a">'+L+'</span> · now tap the end of your range';
+      return;
+    }
+    if(L!==null && R!==null){
+      for(var k=L;k<=R;k++) cs[k].classList.add('sel');
+      ts[L].classList.add('hiL');       // prefix[L] gets subtracted
+      ts[R+1].classList.add('hiR');     // prefix[R+1] is the running total
+      var val=prefix[R+1]-prefix[L];
+      outEl.innerHTML =
+        'sum(<span class="a">'+L+'</span> .. <span class="a">'+R+'</span>) = '+
+        'prefix[<span class="a">'+(R+1)+'</span>] &minus; prefix[<span class="c">'+L+'</span>] = '+
+        prefix[R+1]+' &minus; '+prefix[L]+' = <span class="g">'+val+'</span>';
+      return;
+    }
+    outEl.innerHTML='Tap a cell to set the start of your range…';
+  }
+
+  document.getElementById('dreset').addEventListener('click',function(){
+    L=null;R=null;render();
+  });
+
+  // ---------- scroll reveal (respects reduced motion) ----------
+  var rm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(!rm && 'IntersectionObserver' in window){
+    var obs=new IntersectionObserver(function(entries){
+      entries.forEach(function(en){ if(en.isIntersecting){ en.target.classList.add('in'); obs.unobserve(en.target);} });
+    },{threshold:0.08});
+    document.querySelectorAll('.reveal').forEach(function(el){obs.observe(el);});
+  } else {
+    document.querySelectorAll('.reveal').forEach(function(el){el.classList.add('in');});
+  }
+})();
+</script>
+</body>
+</html>
