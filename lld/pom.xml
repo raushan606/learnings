@@ -28,6 +28,7 @@
         <module>vending-machine</module>
         <module>movie-booking</module>
         <module>task-scheduler</module>
+        <module>traffic-control-system</module>
     </modules>
 
     <properties>
