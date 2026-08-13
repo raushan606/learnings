@@ -29,6 +29,7 @@
         <module>movie-booking</module>
         <module>task-scheduler</module>
         <module>traffic-control-system</module>
+        <module>splitwise</module>
     </modules>
 
     <properties>
